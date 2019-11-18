@@ -52,18 +52,17 @@ fromVertices ps =
 toVertices :: Path V2 Double -> [Point V2 Double]
 toVertices = mconcat . pathVertices
 
-tpos, xpos, ypos :: Integer -> KBD Double
+tpos :: Integer -> KBD (Double, Double)
 tpos n = do
   k <- ask
-  return $ fromInteger n * _rowSpacing k + (_sep k / 2)
+  return (fromInteger n * _rowSpacing k + (_sep k / 2), _columnSpacing k / 2)
 
-xpos n = do
+kpos :: Integer -> Integer -> KBD (Double, Double)
+kpos m n = do
   k <- ask
-  tpos (n + _nThumb k)
-
-ypos n = do
-  k <- ask
-  return $ fromInteger n * _columnSpacing k
+  st <- staggering'
+  (x, _) <- tpos (m + _nThumb k)
+  return (x, (st !! fromInteger m) + (fromInteger n * _columnSpacing k))
 
 staggering' :: KBD [Double]
 staggering' = do
@@ -86,16 +85,9 @@ switchHoleNotched = do
 
 switchHolesPos :: [Integer] -> [Integer] -> [Integer] -> KBD [(Double, Double)]
 switchHolesPos xr yr tr = do
-  k <- ask
-  st <- staggering'
-  let lft = mapM (\(ma, mb) -> (,) <$> ma <*> mb)
-      keys =
-        [ (xpos x, (+ (st !! fromInteger x)) <$> ypos y)
-        | x <- xr
-        , y <- yr
-        ]
-      tkeys = [(tpos i, pure $ _columnSpacing k / 2) | i <- tr]
-  (++) <$> lft keys <*> lft tkeys
+  keys <- sequence [kpos x y | x <- xr, y <- yr]
+  tkeys <- sequence [tpos i | i <- tr]
+  return $ keys ++ tkeys
 
 allSwitchHolesPos :: KBD [(Double, Double)]
 allSwitchHolesPos = do
@@ -120,13 +112,11 @@ roundHole = do
 screwPos :: KBD [(Double, Double)]
 screwPos = do
   k <- ask
-  r <- xpos (_nCols k - 1)
-  l <- xpos 0
-  t <- ypos (_nRows k - 1)
-  b <- ypos 0
+  (r, t) <- kpos (_nCols k - 1) (_nRows k - 1)
+  (l, b) <- kpos 0 0
   let hx = (_rowSpacing k + _switchHoleSize k / 2) / 2
       hy = (_columnSpacing k + _switchHoleSize k / 2) / 2
-      l' = (r + hx + 2, t + hy - 2)
+      l' = (r + hx, t + hy - 2)
   return
     [ (l - hx, b - hy + 2)
     , (r + hx, b - hy + 3)
