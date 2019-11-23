@@ -148,10 +148,10 @@ screwPos = do
   let (b, l) = (miny ^. _y, miny ^. _x)
       hx = (_rowSpacing k + _switchHoleSize k / 2) / 2
       hy = (_columnSpacing k + _switchHoleSize k / 2) / 2
-      l' = (r + hx, t + hy - 3)
+      l' = (r + hx + 1.4, t + hy - 1)
   return
-    [ (l, b - hy - 1)
-    , (r + hx, b' - hy + 3)
+    [ (l, b - hy - 2)
+    , (r + hx + 1.2, b' - hy + 3)
     , l'
     , unr2 $ rotP (negated $ _angle k) (_sep k / 4, rotP (_angle k) l' ^. _y)
     ]
@@ -168,7 +168,7 @@ outline :: KBD (Path V2 Double)
 outline = do
   k <- ask
   (minx, maxx, miny, maxy) <- boundaryPos
-  let dx = _rowSpacing k - 3
+  let dx = _rowSpacing k - 2
       dy = _columnSpacing k / 3
       w =
         (maxx ^. _x) - (minx ^. _x) + _sep k / 2 + dx / 2 +
@@ -177,8 +177,8 @@ outline = do
       r =
         rect w h # alignBL # translate (r2 (0, -_switchHoleSize k / 2 - dy / 2))
       rot' = papply (rotation $ _angle k)
-      pt1 = rot' miny - p2 (0, _switchHoleSize k / 2 + dy + 2)
-      pt2 = rot' maxy + p2 (0, _switchHoleSize k / 2 + dy - 1)
+      pt1 = rot' miny - p2 (0, _switchHoleSize k / 2 + dy + 3)
+      pt2 = rot' maxy + p2 (0, _switchHoleSize k / 2 + dy + 2)
       r' = r # rotate (_angle k)
       tr p =
         let a = fromVertices p # alignBL
@@ -216,19 +216,8 @@ topPlate = do
         rect
           (_switchHoleSize k + _rowSpacing k / 4)
           (_switchHoleSize k + _columnSpacing k / 4)
-      pp p =
-        if odd $ _nThumb k
-          then do
-            p' <- tpos 0
-            let r =
-                  rect
-                    (_switchHoleSize k + _rowSpacing k / 4)
-                    (_switchHoleSize k + _columnSpacing k * 0.7)
-            mr <- placeRotated [p'] r
-            return $ p <> mr
-          else return p
   inner <- placeRotated ashp innerR
-  mask <- roundPath (-1) . union Winding <$> pp inner
+  let mask = roundPath (-1) . union Winding $ inner
   return $ difference Winding bp $ mirror mask
 
 spacerPlate :: KBD (Path V2 Double)
