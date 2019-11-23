@@ -66,7 +66,10 @@ tpos n = do
         ]
   return
     ( fst (lut !! n) * _rowSpacing k + (_sep k / 2)
-    , _columnSpacing k / 2 - snd (lut !! n) * _columnSpacing k)
+    , (if _nThumb k > 1 && odd (_nThumb k) && (n == 0)
+         then 0
+         else _columnSpacing k / 2) -
+      snd (lut !! n) * _columnSpacing k)
 
 kpos :: Int -> Int -> KBD (Double, Double)
 kpos m n = do
@@ -145,9 +148,9 @@ screwPos = do
   let (b, l) = (miny ^. _y, miny ^. _x)
       hx = (_rowSpacing k + _switchHoleSize k / 2) / 2
       hy = (_columnSpacing k + _switchHoleSize k / 2) / 2
-      l' = (r + hx, t + hy - 2)
+      l' = (r + hx, t + hy - 3)
   return
-    [ (l, b - hy)
+    [ (l, b - hy - 1)
     , (r + hx, b' - hy + 3)
     , l'
     , unr2 $ rotP (negated $ _angle k) (_sep k / 4, rotP (_angle k) l' ^. _y)
@@ -174,7 +177,7 @@ outline = do
       r =
         rect w h # alignBL # translate (r2 (0, -_switchHoleSize k / 2 - dy / 2))
       rot' = papply (rotation $ _angle k)
-      pt1 = rot' miny - p2 (0, _switchHoleSize k / 2 + dy)
+      pt1 = rot' miny - p2 (0, _switchHoleSize k / 2 + dy + 2)
       pt2 = rot' maxy + p2 (0, _switchHoleSize k / 2 + dy - 1)
       r' = r # rotate (_angle k)
       tr p =
@@ -235,11 +238,13 @@ spacerPlate = do
   sp <- screwPos
   sh <- screwHoles
   let w = 12
-      punch =
-        o # scaleToX (width o - w) # scaleToY (height o - w) #
-        translate (V2 0 w / 2)
+      punch = o # scaleToX (width o - w) # scaleToY (height o - w)
+      (c1, c2) = (cntr punch ^. _y, cntr o ^. _y)
+        where
+          cntr :: Path V2 Double -> Point V2 Double
+          cntr p = fromJust (mCenterPoint p)
   disks <- union Winding <$> placeRotated sp (circle (_washerSize k / 3))
-  let fr = difference Winding o punch
+  let fr = difference Winding o (punch # translate (V2 0 (c2 - c1)))
       plate = intersection Winding o $ mirror disks <> fr
   return $ difference Winding plate sh
 
@@ -250,7 +255,7 @@ render k =
       name = "atreus" ++ show (2 * (_nRows k * _nCols k + _nThumb k)) ++ ".svg"
       dpi = 96
       sf = dpi / 25.4
-      lineW = sf * 0.1
+      lineW = sf * 0.2
       stops = mkStops [(gray, 0, 1), (white, 0.5, 1), (gray, 1, 1)]
       gradient =
         mkLinearGradient
@@ -262,7 +267,7 @@ render k =
         fillTexture gradient :
         fmap (\c -> fcA (c `withOpacity` 0.5)) (cycle [yellow, green, blue])
       assembly = reverse $ zipWith (\s p -> strokePath p # s) aStyles parts
-      diagram = frame 1.05 (vsep 5 (assembly ++ [mconcat assembly])) # lwG lineW
+      diagram = frame 1.05 (vsep 5 (assembly ++ [mconcat assembly])) # lwO lineW
       sizeSp = dims2D (sf * width diagram) (sf * height diagram)
    in renderSVG ("images/" ++ name) sizeSp diagram
 
@@ -280,7 +285,7 @@ main = do
           , _angle = ang
           , _staggering = [0, 5, 11, 6, 3, 2]
           , _screwSize = 3
-          , _washerSize = 15
+          , _washerSize = 13
           , _sep = 40
           }
       atreus44 = atreus42 & nThumb .~ 2
