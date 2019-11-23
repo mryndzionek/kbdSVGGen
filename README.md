@@ -22,7 +22,9 @@ Comfortable Atreus62 ? Here it is:
 ![atreus62](images/atreus62.svg)
 
 Feeling daring today :smile: ?
-![atreus204](images/atreus204.svg)
+![atreus206](images/atreus206.svg)
+![atreus208](images/atreus208.svg)
+![atreus210](images/atreus210.svg)
 
 Compiling and running
 ---------------------

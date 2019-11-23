@@ -19,9 +19,9 @@ import           Diagrams.TwoD.Path.Boolean
 type KBD = Reader KBDCfg
 
 data KBDCfg = KBDCfg
-  { _nRows          :: Integer
-  , _nCols          :: Integer
-  , _nThumb         :: Integer
+  { _nRows          :: Int
+  , _nCols          :: Int
+  , _nThumb         :: Int
   , _columnSpacing  :: Double
   , _rowSpacing     :: Double
   , _switchHoleSize :: Double
@@ -52,17 +52,31 @@ fromVertices ps =
 toVertices :: Path V2 Double -> [Point V2 Double]
 toVertices = mconcat . pathVertices
 
-tpos :: Integer -> KBD (Double, Double)
+tpos :: Int -> KBD (Double, Double)
 tpos n = do
   k <- ask
-  return (fromInteger n * _rowSpacing k + (_sep k / 2), _columnSpacing k / 2)
+  let lut =
+        [ ( fromIntegral $
+            (if odd (_nThumb k)
+               then i + 1
+               else i) `quot`
+            2
+          , fromIntegral $ i `rem` 2)
+        | i <- [0 .. _nThumb k - 1]
+        ]
+  return
+    ( fst (lut !! n) * _rowSpacing k + (_sep k / 2)
+    , _columnSpacing k / 2 - snd (lut !! n) * _columnSpacing k)
 
-kpos :: Integer -> Integer -> KBD (Double, Double)
+kpos :: Int -> Int -> KBD (Double, Double)
 kpos m n = do
   k <- ask
   st <- staggering'
-  (x, _) <- tpos (m + _nThumb k)
-  return (x, (st !! fromInteger m) + (fromInteger n * _columnSpacing k))
+  let nt = fromIntegral $ (_nThumb k + 1) `quot` 2
+  let x = nt * _rowSpacing k + (_sep k / 2)
+  return
+    ( x + fromIntegral m * _rowSpacing k
+    , (st !! fromIntegral m) + (fromIntegral n * _columnSpacing k))
 
 staggering' :: KBD [Double]
 staggering' = do
@@ -83,7 +97,22 @@ switchHoleNotched = do
     rect (_switchHoleSize k + 2 * notchDepth) notchWidth #
     translate (V2 0 (-notchOffset))
 
-switchHolesPos :: [Integer] -> [Integer] -> [Integer] -> KBD [(Double, Double)]
+boundaryPos :: KBD (P2 Double, P2 Double, P2 Double, P2 Double)
+boundaryPos = do
+  k <- ask
+  ashp <- allSwitchHolesPos
+  let srt f g =
+        p2 $
+        minimumBy
+          (g `on` (\p -> maximum $ f <$> [rotP (_angle k) p, r2 p]))
+          ashp
+  return
+    ( srt (^. _x) compare
+    , srt (^. _x) $ flip compare
+    , srt (^. _y) compare
+    , srt (^. _y) $ flip compare)
+
+switchHolesPos :: [Int] -> [Int] -> [Int] -> KBD [(Double, Double)]
 switchHolesPos xr yr tr = do
   keys <- sequence [kpos x y | x <- xr, y <- yr]
   tkeys <- sequence [tpos i | i <- tr]
@@ -105,21 +134,21 @@ switchHoles hole = do
   return $ mirror keys
 
 roundHole :: KBD (Path V2 Double)
-roundHole = do
-  k <- ask
-  return $ circle (_screwSize k / 2)
+roundHole = asks $ circle . (/ 2) . _screwSize
 
 screwPos :: KBD [(Double, Double)]
 screwPos = do
   k <- ask
+  (_, _, miny, _) <- boundaryPos
   (r, t) <- kpos (_nCols k - 1) (_nRows k - 1)
-  (l, b) <- kpos 0 0
-  let hx = (_rowSpacing k + _switchHoleSize k / 2) / 2
+  (_, b') <- kpos 0 0
+  let (b, l) = (miny ^. _y, miny ^. _x)
+      hx = (_rowSpacing k + _switchHoleSize k / 2) / 2
       hy = (_columnSpacing k + _switchHoleSize k / 2) / 2
       l' = (r + hx, t + hy - 2)
   return
-    [ (l - hx, b - hy + 2)
-    , (r + hx, b - hy + 3)
+    [ (l, b - hy)
+    , (r + hx, b' - hy + 3)
     , l'
     , unr2 $ rotP (negated $ _angle k) (_sep k / 4, rotP (_angle k) l' ^. _y)
     ]
@@ -135,17 +164,8 @@ screwHoles = fmap mirror (join $ placeRotated <$> screwPos <*> roundHole)
 outline :: KBD (Path V2 Double)
 outline = do
   k <- ask
-  ashp <- allSwitchHolesPos
-  let srt f g =
-        p2 $
-        minimumBy
-          (g `on` (\p -> maximum $ f <$> [rotP (_angle k) p, r2 p]))
-          ashp
-      minx = srt (^. _x) compare
-      maxx = srt (^. _x) $ flip compare
-      miny = srt (^. _y) compare
-      maxy = srt (^. _y) $ flip compare
-      dx = _rowSpacing k - 3
+  (minx, maxx, miny, maxy) <- boundaryPos
+  let dx = _rowSpacing k - 3
       dy = _columnSpacing k / 3
       w =
         (maxx ^. _x) - (minx ^. _x) + _sep k / 2 + dx / 2 +
@@ -193,8 +213,19 @@ topPlate = do
         rect
           (_switchHoleSize k + _rowSpacing k / 4)
           (_switchHoleSize k + _columnSpacing k / 4)
+      pp p =
+        if odd $ _nThumb k
+          then do
+            p' <- tpos 0
+            let r =
+                  rect
+                    (_switchHoleSize k + _rowSpacing k / 4)
+                    (_switchHoleSize k + _columnSpacing k * 0.7)
+            mr <- placeRotated [p'] r
+            return $ p <> mr
+          else return p
   inner <- placeRotated ashp innerR
-  let mask = roundPath (-1) $ union Winding inner
+  mask <- roundPath (-1) . union Winding <$> pp inner
   return $ difference Winding bp $ mirror mask
 
 spacerPlate :: KBD (Path V2 Double)
@@ -252,8 +283,21 @@ main = do
           , _washerSize = 15
           , _sep = 40
           }
+      atreus44 = atreus42 & nThumb .~ 2
       atreus50 = atreus42 & nCols .~ 6
+      atreus52 = atreus50 & nThumb .~ 2
       atreus62 = atreus50 & nRows .~ 5
-      atreus204 = atreus42 & nCols .~ 10 & nRows .~ 10 & nThumb .~ 2
-      ks = [atreus42, atreus50, atreus62, atreus204]
+      atreus206 = atreus42 & nCols .~ 10 & nRows .~ 10 & nThumb .~ 3
+      atreus208 = atreus42 & nCols .~ 10 & nRows .~ 10 & nThumb .~ 4
+      atreus210 = atreus42 & nCols .~ 10 & nRows .~ 10 & nThumb .~ 5
+      ks =
+        [ atreus42
+        , atreus44
+        , atreus50
+        , atreus52
+        , atreus62
+        , atreus206
+        , atreus208
+        , atreus210
+        ]
   mapM_ render ks
