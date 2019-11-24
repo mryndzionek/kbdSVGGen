@@ -31,7 +31,19 @@ data KBDCfg = KBDCfg
   , _washerSize     :: Double
   , _sep            :: Double
   , _hooks          :: Bool
+  , _split          :: Bool
   }
+
+instance Show KBDCfg where
+  show k =
+    "atreus" ++
+    show (2 * (_nRows k * _nCols k + _nThumb k)) ++
+    (if _split k
+       then "s"
+       else "") ++
+    (if _hooks k
+       then "h"
+       else "")
 
 makeLenses ''KBDCfg
 
@@ -41,8 +53,13 @@ rotP a p = apply (rotation a) (r2 p)
 roundPath :: Double -> Path V2 Double -> Path V2 Double
 roundPath = offsetPath' (with & offsetJoin .~ LineJoinRound)
 
-mirror :: Path V2 Double -> Path V2 Double
-mirror p = union Winding $ p <> p # reversePath # reflectX
+mirror :: Path V2 Double -> KBD (Path V2 Double)
+mirror p = do
+  isSplit <- asks _split
+  return . union Winding $
+    if isSplit
+      then reversePath p
+      else p <> p # reversePath # reflectX
 
 fromVertices :: (Metric v, Floating n, Ord n) => [Point v n] -> Path v n
 fromVertices ps =
@@ -135,7 +152,7 @@ switchHoles hole = do
         rotate (_angle k) $
         union Winding $
         mconcat $ (\(x, y) -> hole # translate (V2 x y)) <$> ashp
-  return $ mirror keys
+  mirror keys
 
 roundHole :: KBD (Path V2 Double)
 roundHole = asks $ circle . (/ 2) . _screwSize
@@ -159,11 +176,11 @@ screwPos = do
 
 placeRotated :: [(Double, Double)] -> Path V2 Double -> KBD (Path V2 Double)
 placeRotated ps s = do
-  k <- ask
-  return $ mconcat $ (\p -> s # translate (r2 p) # rotate (_angle k)) <$> ps
+  a <- asks _angle
+  return $ mconcat $ (\p -> s # translate (r2 p) # rotate a) <$> ps
 
 screwHoles :: KBD (Path V2 Double)
-screwHoles = fmap mirror (join $ placeRotated <$> screwPos <*> roundHole)
+screwHoles = join (placeRotated <$> screwPos <*> roundHole) >>= mirror
 
 outline :: KBD (Path V2 Double)
 outline = do
@@ -195,7 +212,7 @@ outline = do
       mask1 = tr vs1
       np = fromJust $ maxTraceP (head ps) (unitY # rotate (_angle k)) mask1
       vs2 = [head ps, np, p2 (0, pt2 ^. _y), p2 (0, pt1 ^. _y), pt1]
-  return $ tr vs2 # mirror # roundPath (-_washerSize k / 4)
+  roundPath (-_washerSize k / 4) <$> (tr vs2 # mirror)
 
 bottomPlate :: KBD (Path V2 Double)
 bottomPlate = do
@@ -206,17 +223,19 @@ addHooks :: Path V2 Double -> KBD (Path V2 Double)
 addHooks p = do
   sp <- screwPos
   ang <- asks _angle
+  isSplit <- asks _split
   let a =
         ang ^+^ negated (signedAngleBetween unitX (r2 (sp !! 1) - r2 (head sp)))
+      an = if isSplit then (-45 @@ deg) else (-20 @@ deg)
       hp =
         fromJust $
-        maxTraceP (fromJust (mCenterPoint p)) (unitX # rotate (-20 @@ deg)) p
+        maxTraceP (fromJust (mCenterPoint p)) (unitX # rotate an) p
       hook =
         difference Winding (rect 9 9) (rect 8 3 # translate (-unitY * 2.5)) #
         roundPath (-0.5) #
         rotate a #
         moveTo hp
-  return $ p <> mirror hook
+  mappend p <$> mirror hook
 
 switchPlate :: KBD (Path V2 Double)
 switchPlate = do
@@ -238,7 +257,7 @@ topPlate = do
           (_switchHoleSize k + _columnSpacing k / 4)
   inner <- placeRotated ashp innerR
   let mask = roundPath (-1) . union Winding $ inner
-  return $ difference Winding bp $ mirror mask
+  difference Winding bp <$> mirror mask
 
 spacerPlate :: KBD (Path V2 Double)
 spacerPlate = do
@@ -253,15 +272,25 @@ spacerPlate = do
           cntr :: Path V2 Double -> Point V2 Double
           cntr p = fromJust (mCenterPoint p)
   disks <- union Winding <$> placeRotated sp (circle (_washerSize k / 3))
-  let fr = difference Winding o (punch # translate (V2 0 (c2 - c1)))
-      plate = intersection Winding o $ mirror disks <> fr
+  let fr =
+        difference
+          Winding
+          o
+          (punch #
+           translate
+             (V2
+                (if _split k
+                   then w / 2
+                   else 0)
+                (c2 - c1)))
+  plate <- intersection Winding o <$> (mappend fr <$> mirror disks)
   return $ difference Winding plate sh
 
 render :: KBDCfg -> IO ()
 render k =
   let parts =
         (`runReader` k) <$> [bottomPlate, spacerPlate, switchPlate, topPlate]
-      name = "atreus" ++ show (2 * (_nRows k * _nCols k + _nThumb k)) ++ ".svg"
+      fname = "images/" ++ show k ++ ".svg"
       dpi = 96
       sf = dpi / 25.4
       lineW = sf * 0.2
@@ -278,7 +307,7 @@ render k =
       assembly = reverse $ zipWith (\s p -> strokePath p # s) aStyles parts
       diagram = frame 1.05 (vsep 5 (assembly ++ [mconcat assembly])) # lwO lineW
       sizeSp = dims2D (sf * width diagram) (sf * height diagram)
-   in renderSVG ("images/" ++ name) sizeSp diagram
+   in renderSVG fname sizeSp diagram
 
 main :: IO ()
 main = do
@@ -297,20 +326,25 @@ main = do
           , _washerSize = 13
           , _sep = 40
           , _hooks = False
+          , _split = False
           }
       atreus44 = atreus42 & nThumb .~ 2
       atreus50 = atreus42 & nCols .~ 6
-      atreus52 = atreus50 & nThumb .~ 2 & hooks .~ True
+      atreus52h = atreus50 & nThumb .~ 2 & hooks .~ True
+      atreus52s = atreus52h & split .~ True & hooks .~ False
       atreus62 = atreus50 & nRows .~ 5
+      atreus62s = atreus62 & split .~ True
       atreus206 = atreus42 & nCols .~ 10 & nRows .~ 10 & nThumb .~ 3
-      atreus208 = atreus42 & nCols .~ 10 & nRows .~ 10 & nThumb .~ 4
-      atreus210 = atreus42 & nCols .~ 10 & nRows .~ 10 & nThumb .~ 5
+      atreus208 = atreus206 & nThumb .~ 4
+      atreus210 = atreus208 & nThumb .~ 5
       ks =
         [ atreus42
         , atreus44
         , atreus50
-        , atreus52
+        , atreus52h
+        , atreus52s
         , atreus62
+        , atreus62s
         , atreus206
         , atreus208
         , atreus210
