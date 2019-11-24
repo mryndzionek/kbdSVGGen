@@ -30,6 +30,7 @@ data KBDCfg = KBDCfg
   , _screwSize      :: Double
   , _washerSize     :: Double
   , _sep            :: Double
+  , _hooks          :: Bool
   }
 
 makeLenses ''KBDCfg
@@ -201,11 +202,30 @@ bottomPlate = do
   o <- outline
   difference Winding o <$> screwHoles
 
+addHooks :: Path V2 Double -> KBD (Path V2 Double)
+addHooks p = do
+  sp <- screwPos
+  ang <- asks _angle
+  let a =
+        ang ^+^ negated (signedAngleBetween unitX (r2 (sp !! 1) - r2 (head sp)))
+      hp =
+        fromJust $
+        maxTraceP (fromJust (mCenterPoint p)) (unitX # rotate (-20 @@ deg)) p
+      hook =
+        difference Winding (rect 9 9) (rect 8 3 # translate (-unitY * 2.5)) #
+        roundPath (-0.5) #
+        rotate a #
+        moveTo hp
+  return $ p <> mirror hook
+
 switchPlate :: KBD (Path V2 Double)
 switchPlate = do
-  bp <- bottomPlate
-  sh <- switchHoleNotched >>= switchHoles
-  return $ difference Winding bp sh
+  hasHooks <- asks _hooks
+  difference Winding <$>
+    (if hasHooks
+       then bottomPlate >>= addHooks
+       else bottomPlate) <*>
+    (switchHoleNotched >>= switchHoles)
 
 topPlate :: KBD (Path V2 Double)
 topPlate = do
@@ -276,10 +296,11 @@ main = do
           , _screwSize = 3
           , _washerSize = 13
           , _sep = 40
+          , _hooks = False
           }
       atreus44 = atreus42 & nThumb .~ 2
       atreus50 = atreus42 & nCols .~ 6
-      atreus52 = atreus50 & nThumb .~ 2
+      atreus52 = atreus50 & nThumb .~ 2 & hooks .~ True
       atreus62 = atreus50 & nRows .~ 5
       atreus206 = atreus42 & nCols .~ 10 & nRows .~ 10 & nThumb .~ 3
       atreus208 = atreus42 & nCols .~ 10 & nRows .~ 10 & nThumb .~ 4
