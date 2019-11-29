@@ -70,6 +70,11 @@ fromVertices ps =
 toVertices :: Path V2 Double -> [Point V2 Double]
 toVertices = mconcat . pathVertices
 
+adjP :: [Point V2 Double] -> Path V2 Double
+adjP ps =
+  let a = fromVertices ps # alignBL
+   in a # translate (r2 . unp2 $ (head ps - head (toVertices a)))
+
 tpos :: Int -> KBD (Double, Double)
 tpos n = do
   k <- ask
@@ -159,35 +164,25 @@ roundHole = asks $ circle . (/ 2) . _screwSize
 
 screwPos :: KBD [(Double, Double)]
 screwPos = do
-  k <- ask
-  (_, _, miny, _) <- boundaryPos
-  (r, t) <- kpos (_nCols k - 1) (_nRows k - 1)
-  (_, b') <- kpos 0 0
-  let (b, l) = (miny ^. _y, miny ^. _x)
-      hx = (_rowSpacing k + _switchHoleSize k / 2) / 2
-      hy = (_columnSpacing k + _switchHoleSize k / 2) / 2
-      l' = (r + hx + 1.4, t + hy - 1)
-  return
-    [ (l, b - hy - 2)
-    , (r + hx + 1.2, b' - hy + 3)
-    , l'
-    , unr2 $ rotP (negated $ _angle k) (_sep k / 4, rotP (_angle k) l' ^. _y)
-    ]
+  s <- asks _sep
+  ps <- outlinePos
+  let d = 1
+      (br, tr, tl, bl) = (head ps, ps !! 1, ps !! 2, ps !! 4)
+  return [bl, br + (-d, d), tr + (-d, -d), tl + (s / 2, 0)]
 
-placeRotated :: [(Double, Double)] -> Path V2 Double -> KBD (Path V2 Double)
-placeRotated ps s = do
-  a <- asks _angle
-  return $ mconcat $ (\p -> s # translate (r2 p) # rotate a) <$> ps
+placeRotated ::
+     Angle Double -> [(Double, Double)] -> Path V2 Double -> Path V2 Double
+placeRotated a ps s = mconcat $ (\p -> s # translate (r2 p) # rotate a) <$> ps
 
 screwHoles :: KBD (Path V2 Double)
-screwHoles = join (placeRotated <$> screwPos <*> roundHole) >>= mirror
+screwHoles = (placeRotated (0 @@ deg) <$> screwPos <*> roundHole) >>= mirror
 
-outline :: KBD (Path V2 Double)
-outline = do
+outlinePos :: KBD [(Double, Double)]
+outlinePos = do
   k <- ask
   (minx, maxx, miny, maxy) <- boundaryPos
   let dx = _rowSpacing k - 2
-      dy = _columnSpacing k / 3
+      dy = _columnSpacing k / 3 - 1
       w =
         (maxx ^. _x) - (minx ^. _x) + _sep k / 2 + dx / 2 +
         _switchHoleSize k / 2
@@ -198,9 +193,6 @@ outline = do
       pt1 = rot' miny - p2 (0, _switchHoleSize k / 2 + dy + 3)
       pt2 = rot' maxy + p2 (0, _switchHoleSize k / 2 + dy + 2)
       r' = r # rotate (_angle k)
-      tr p =
-        let a = fromVertices p # alignBL
-         in a # translate (r2 . unp2 $ (head ps - head (toVertices a)))
       ps = toVertices r'
       vs1 =
         [ head ps
@@ -209,10 +201,15 @@ outline = do
         , p2 (0, pt1 ^. _y)
         , pt1
         ]
-      mask1 = tr vs1
+      mask1 = adjP vs1
       np = fromJust $ maxTraceP (head ps) (unitY # rotate (_angle k)) mask1
-      vs2 = [head ps, np, p2 (0, pt2 ^. _y), p2 (0, pt1 ^. _y), pt1]
-  roundPath (-_washerSize k / 4) <$> (tr vs2 # mirror)
+  return $ fmap unp2 [head ps, np, p2 (0, pt2 ^. _y), p2 (0, pt1 ^. _y), pt1]
+
+outline :: KBD (Path V2 Double)
+outline = do
+  k <- ask
+  vs2 <- outlinePos
+  roundPath (-_washerSize k / 4) <$> (adjP (p2 <$> vs2) # mirror)
 
 bottomPlate :: KBD (Path V2 Double)
 bottomPlate = do
@@ -222,16 +219,22 @@ bottomPlate = do
 addHooks :: Path V2 Double -> KBD (Path V2 Double)
 addHooks p = do
   sp <- screwPos
-  ang <- asks _angle
   isSplit <- asks _split
-  let a =
-        ang ^+^ negated (signedAngleBetween unitX (r2 (sp !! 1) - r2 (head sp)))
-      an = if isSplit then (-45 @@ deg) else (-20 @@ deg)
+  let w = 16
+      h = 3
+      d = 1.5
+      a = negated (signedAngleBetween unitX (r2 (sp !! 1) - r2 (head sp)))
+      an =
+        if isSplit
+          then (-45 @@ deg)
+          else (-20 @@ deg)
       hp =
-        fromJust $
-        maxTraceP (fromJust (mCenterPoint p)) (unitX # rotate an) p
+        fromJust $ maxTraceP (fromJust (mCenterPoint p)) (unitX # rotate an) p
       hook =
-        difference Winding (rect 9 9) (rect 8 3 # translate (-unitY * 2.5)) #
+        difference
+          Winding
+          (rect (w + d) 9)
+          (rect w h # translate (-unitY * 2.5)) #
         roundPath (-0.5) #
         rotate a #
         moveTo hp
@@ -253,9 +256,9 @@ topPlate = do
   bp <- bottomPlate
   let innerR =
         rect
-          (_switchHoleSize k + _rowSpacing k / 4)
-          (_switchHoleSize k + _columnSpacing k / 4)
-  inner <- placeRotated ashp innerR
+          (_switchHoleSize k + _rowSpacing k / 4 + 1)
+          (_switchHoleSize k + _columnSpacing k / 4 + 1)
+      inner = placeRotated (_angle k) ashp innerR
   let mask = roundPath (-1) . union Winding $ inner
   difference Winding bp <$> mirror mask
 
@@ -271,7 +274,8 @@ spacerPlate = do
         where
           cntr :: Path V2 Double -> Point V2 Double
           cntr p = fromJust (mCenterPoint p)
-  disks <- union Winding <$> placeRotated sp (circle (_washerSize k / 3))
+      disks =
+        union Winding $ placeRotated (0 @@ deg) sp (circle (_washerSize k / 3))
   let fr =
         difference
           Winding
@@ -331,7 +335,8 @@ main = do
       atreus44 = atreus42 & nThumb .~ 2
       atreus50 = atreus42 & nCols .~ 6
       atreus52h = atreus50 & nThumb .~ 2 & hooks .~ True
-      atreus52s = atreus52h & split .~ True & hooks .~ False
+      atreus52s =
+        atreus52h & split .~ True & hooks .~ False & angle .~ (0 @@ deg)
       atreus62 = atreus50 & nRows .~ 5
       atreus62s = atreus62 & split .~ True
       atreus206 = atreus42 & nCols .~ 10 & nRows .~ 10 & nThumb .~ 3
