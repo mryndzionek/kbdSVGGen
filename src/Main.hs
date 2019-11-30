@@ -25,6 +25,7 @@ data KBDCfg = KBDCfg
   , _columnSpacing  :: Double
   , _rowSpacing     :: Double
   , _switchHoleSize :: Double
+  , _spacerWidth    :: Double
   , _angle          :: Angle Double
   , _staggering     :: [Double]
   , _screwSize      :: Double
@@ -165,10 +166,11 @@ roundHole = asks $ circle . (/ 2) . _screwSize
 screwPos :: KBD [(Double, Double)]
 screwPos = do
   s <- asks _sep
+  sw <- asks _spacerWidth
   ps <- outlinePos
-  let d = 1
+  let d = (sw / 2) - 2
       (br, tr, tl, bl) = (head ps, ps !! 1, ps !! 2, ps !! 4)
-  return [bl, br + (-d, d), tr + (-d, -d), tl + (s / 2, 0)]
+  return [bl + (0, d), br + (-d, d), tr + (-d, -d), tl + (s / 2, -d)]
 
 placeRotated ::
      Angle Double -> [(Double, Double)] -> Path V2 Double -> Path V2 Double
@@ -268,8 +270,8 @@ spacerPlate = do
   o <- outline
   sp <- screwPos
   sh <- screwHoles
-  let w = 12
-      punch = o # scaleToX (width o - w) # scaleToY (height o - w)
+  let w = 2 * _spacerWidth k
+      punch = o # scaleToX (width o - w) # scaleToY (height o - w) # reversePath
       (c1, c2) = (cntr punch ^. _y, cntr o ^. _y)
         where
           cntr :: Path V2 Double -> Point V2 Double
@@ -324,6 +326,7 @@ main = do
           , _columnSpacing = 19
           , _rowSpacing = 19
           , _switchHoleSize = 13.97
+          , _spacerWidth = 6
           , _angle = ang
           , _staggering = [0, 5, 11, 6, 3, 2]
           , _screwSize = 3
