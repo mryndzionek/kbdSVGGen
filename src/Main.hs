@@ -25,11 +25,13 @@ data KBDCfg = KBDCfg
   , _columnSpacing  :: Double
   , _rowSpacing     :: Double
   , _switchHoleSize :: Double
+  , _switchHole     :: Double -> Path V2 Double
   , _spacerWidth    :: Double
   , _angle          :: Angle Double
   , _staggering     :: [Double]
   , _screwSize      :: Double
   , _washerSize     :: Double
+  , _screwHole      :: Double -> Path V2 Double
   , _sep            :: Double
   , _hooks          :: Bool
   , _split          :: Bool
@@ -110,19 +112,19 @@ staggering' = do
   k <- ask
   return $ _staggering k ++ repeat (last $ _staggering k)
 
-switchHoleNotched :: KBD (Path V2 Double)
-switchHoleNotched = do
-  k <- ask
+switchHoleSquare :: Double -> Path V2 Double
+switchHoleSquare = square
+
+switchHoleNotched :: Double -> Path V2 Double
+switchHoleNotched s =
   let notchWidth = 3.5001
       notchOffset = 4.2545
       notchDepth = 0.8128
-  return $
-    union Winding $
-    square (_switchHoleSize k) <>
-    rect (_switchHoleSize k + 2 * notchDepth) notchWidth #
-    translate (V2 0 notchOffset) <>
-    rect (_switchHoleSize k + 2 * notchDepth) notchWidth #
-    translate (V2 0 (-notchOffset))
+   in union Winding $
+      switchHoleSquare s <> rect (s + 2 * notchDepth) notchWidth #
+      translate (V2 0 notchOffset) <>
+      rect (s + 2 * notchDepth) notchWidth #
+      translate (V2 0 (-notchOffset))
 
 boundaryPos :: KBD (P2 Double, P2 Double, P2 Double, P2 Double)
 boundaryPos = do
@@ -160,8 +162,13 @@ switchHoles hole = do
         mconcat $ (\(x, y) -> hole # translate (V2 x y)) <$> ashp
   mirror keys
 
-roundHole :: KBD (Path V2 Double)
-roundHole = asks $ circle . (/ 2) . _screwSize
+roundHole :: Double -> Path V2 Double
+roundHole = circle . (/ 2)
+
+hexagonalHole :: Double -> Path V2 Double
+hexagonalHole d =
+  let r = d / (2.0 * sinA (60 @@ deg))
+   in hexagon r
 
 screwPos :: KBD [(Double, Double)]
 screwPos = do
@@ -177,7 +184,9 @@ placeRotated ::
 placeRotated a ps s = mconcat $ (\p -> s # translate (r2 p) # rotate a) <$> ps
 
 screwHoles :: KBD (Path V2 Double)
-screwHoles = (placeRotated (0 @@ deg) <$> screwPos <*> roundHole) >>= mirror
+screwHoles = do
+  let hole = asks _screwHole <*> asks _screwSize
+  (placeRotated (0 @@ deg) <$> screwPos <*> hole) >>= mirror
 
 outlinePos :: KBD [(Double, Double)]
 outlinePos = do
@@ -244,12 +253,13 @@ addHooks p = do
 
 switchPlate :: KBD (Path V2 Double)
 switchPlate = do
+  let hole = asks _switchHole <*> asks _switchHoleSize
   hasHooks <- asks _hooks
   difference Winding <$>
     (if hasHooks
        then bottomPlate >>= addHooks
        else bottomPlate) <*>
-    (switchHoleNotched >>= switchHoles)
+    (hole >>= switchHoles)
 
 topPlate :: KBD (Path V2 Double)
 topPlate = do
@@ -326,11 +336,13 @@ main = do
           , _columnSpacing = 19
           , _rowSpacing = 19
           , _switchHoleSize = 13.97
+          , _switchHole = switchHoleNotched
           , _spacerWidth = 6
           , _angle = ang
           , _staggering = [0, 5, 11, 6, 3, 2]
           , _screwSize = 3
           , _washerSize = 13
+          , _screwHole = roundHole
           , _sep = 40
           , _hooks = False
           , _split = False
