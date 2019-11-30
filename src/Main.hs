@@ -35,6 +35,7 @@ data KBDCfg = KBDCfg
   , _sep            :: Double
   , _hooks          :: Bool
   , _split          :: Bool
+  , _logo           :: Maybe (Double, Double, Path V2 Double)
   }
 
 instance Show KBDCfg where
@@ -263,16 +264,21 @@ switchPlate = do
 
 topPlate :: KBD (Path V2 Double)
 topPlate = do
-  k <- ask
+  (sh, rs, cs) <-
+    traverseOf each asks (_switchHoleSize, _rowSpacing, _columnSpacing)
+  a <- asks _angle
+  logo' <- asks _logo
   ashp <- allSwitchHolesPos
   bp <- bottomPlate
-  let innerR =
-        rect
-          (_switchHoleSize k + _rowSpacing k / 4 + 1)
-          (_switchHoleSize k + _columnSpacing k / 4 + 1)
-      inner = placeRotated (_angle k) ashp innerR
+  let innerR = rect (sh + rs / 4 + 1) (sh + cs / 4 + 1)
+      inner = placeRotated a ashp innerR
+      addLogo l p =
+        case l of
+          Nothing -> p
+          Just (w, d, l') ->
+            difference Winding p (l' # scaleUToX w # translate (pure d * unitY))
   let mask = roundPath (-1) . union Winding $ inner
-  difference Winding bp <$> mirror mask
+  addLogo logo' <$> (difference Winding bp <$> mirror mask)
 
 spacerPlate :: KBD (Path V2 Double)
 spacerPlate = do
@@ -346,6 +352,7 @@ main = do
           , _sep = 40
           , _hooks = False
           , _split = False
+          , _logo = Nothing
           }
       atreus44 = atreus42 & nThumb .~ 2
       atreus50 = atreus42 & nCols .~ 6
