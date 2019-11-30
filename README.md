@@ -41,7 +41,6 @@ stack build && stack exec kbdSVGGen
 TODO
 ----
   - [ ] refactor the code to use lenses more
-  - [ ] different file formats
   - [ ] places for connectors
   - [x] 'split' option
   - [ ] simple web UI interface
