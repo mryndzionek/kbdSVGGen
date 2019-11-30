@@ -5,7 +5,7 @@ import           Control.Monad.Reader
 
 import           Data.Function (on)
 import           Data.List     (minimumBy)
-import           Data.Maybe    (fromJust)
+import           Data.Maybe    (fromJust, isNothing)
 
 import           Diagrams.Backend.SVG
 import           Diagrams.Path
@@ -15,6 +15,8 @@ import           Diagrams.Prelude hiding (difference, fromVertices,
 
 import           Diagrams.TwoD.Offset
 import           Diagrams.TwoD.Path.Boolean
+
+import           Graphics.SVGFonts.Text
 
 type KBD = Reader KBDCfg
 
@@ -267,18 +269,20 @@ topPlate = do
   (sh, rs, cs) <-
     traverseOf each asks (_switchHoleSize, _rowSpacing, _columnSpacing)
   a <- asks _angle
-  logo' <- asks _logo
+  lg <- asks _logo
   ashp <- allSwitchHolesPos
   bp <- bottomPlate
+  isSplit <- asks _split
   let innerR = rect (sh + rs / 4 + 1) (sh + cs / 4 + 1)
       inner = placeRotated a ashp innerR
-      addLogo l p =
-        case l of
-          Nothing -> p
-          Just (w, d, l') ->
-            difference Winding p (l' # scaleUToX w # translate (pure d * unitY))
+      addLogo l p
+        | isNothing l || isSplit = p
+        | otherwise =
+          let (w, d, l') = fromJust l
+           in (l' # scaleUToX w # translate (pure d * unitY) :: Path V2 Double) <>
+              (p # reversePath)
   let mask = roundPath (-1) . union Winding $ inner
-  addLogo logo' <$> (difference Winding bp <$> mirror mask)
+  addLogo lg <$> (difference Winding bp <$> mirror mask)
 
 spacerPlate :: KBD (Path V2 Double)
 spacerPlate = do
@@ -331,6 +335,17 @@ render k =
       sizeSp = dims2D (sf * width diagram) (sf * height diagram)
    in renderSVG fname sizeSp diagram
 
+logo' :: Path V2 Double
+logo' =
+  let s1 =
+        alignB . center . toPath . closeLine . fromOffsets $
+        fmap
+          (\(l, a) -> l * unitX # rotate (a @@ deg))
+          [(16, 0), (21, 110), (3, 180), (21, -110)]
+      s2 = difference Winding s1 (ellipse (7 / 10) # scale 7)
+      t = textSVG "Atreus" 1
+   in s2 # scaleUToX (0.9 * width t) <> t # translate (-unitY * pure (height t))
+
 main :: IO ()
 main = do
   let ang = 10 @@ deg
@@ -352,7 +367,7 @@ main = do
           , _sep = 40
           , _hooks = False
           , _split = False
-          , _logo = Nothing
+          , _logo = Just (35, 45, logo')
           }
       atreus44 = atreus42 & nThumb .~ 2
       atreus50 = atreus42 & nCols .~ 6
