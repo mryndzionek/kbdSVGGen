@@ -1,3 +1,6 @@
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeFamilies     #-}
+
 module Main where
 
 import           Control.Lens               hiding ((#), parts, plate)
@@ -160,15 +163,12 @@ allSwitchHolesPos = do
       tkeys <- sequence [tpos i | i <- tr]
       return $ keys ++ tkeys
 
-switchHoles :: Path V2 Double -> KBD (Path V2 Double)
+switchHoles :: (Transformable b, Monoid b, N b ~ Double, V b ~ V2) => b -> KBD b
 switchHoles hole = do
   k <- ask
   ashp <- allSwitchHolesPos
-  let keys =
-        rotate (_angle k) $ union Winding $ mconcat $
-        (\(x, y) -> hole # translate (V2 x y)) <$>
-        ashp
-  mirror keys
+  return $ rotate (_angle k) $ mconcat $ (\(x, y) -> hole # translate (V2 x y)) <$>
+    ashp
 
 roundHole :: Double -> Path V2 Double
 roundHole = circle . (/ 2)
@@ -239,9 +239,7 @@ addHooks :: Path V2 Double -> KBD (Path V2 Double)
 addHooks p = do
   sp <- screwPos
   isSplit <- asks _split
-  let w = 16
-      h = 3
-      d = 1.5
+  let (w, h, d) = (16, 3, 1.5)
       a = negated (signedAngleBetween unitX (r2 (sp !! 1) - r2 (head sp)))
       an =
         if isSplit
@@ -267,7 +265,7 @@ switchPlate = do
     (if hasHooks
        then bottomPlate >>= addHooks
        else bottomPlate) <*>
-    (hole >>= switchHoles)
+    (hole >>= switchHoles >>= mirror)
 
 topPlate :: KBD (Path V2 Double)
 topPlate = do
@@ -317,6 +315,26 @@ spacerPlate = do
   plate <- intersection Winding o <$> (mappend fr <$> mirror disks)
   return $ difference Winding plate sh
 
+mkGradient :: Fractional n => Double -> Colour Double -> n -> Texture n
+mkGradient o c w =
+  let stops = mkStops [(c, 0, o), (white, 0.5, o), (c, 1, o)]
+   in mkLinearGradient stops ((-w) ^& 0) (w ^& 0) GradPad
+
+keycaps :: KBD (Diagram B)
+keycaps = do
+  hs <- asks _switchHoleSize
+  let style c o = fcA (c `withOpacity` o)
+      cap s = square s # roundPath 2
+      cap' =
+        (cap (hs - 5) # strokePath # fillTexture (mkGradient 0.1 black 5)) <>
+        (cap (hs + 0.7) # strokePath # style black 0.7)
+  cs <- switchHoles cap'
+  isSplit <- asks _split
+  return $
+    if isSplit
+      then cs
+      else cs <> cs # reflectX
+
 render :: KBDCfg -> IO ()
 render k =
   let parts =
@@ -325,18 +343,16 @@ render k =
       dpi = 96
       sf = dpi / 25.4
       lineW = sf * 0.2
-      stops = mkStops [(gray, 0, 1), (white, 0.5, 1), (gray, 1, 1)]
-      gradient =
-        mkLinearGradient
-          stops
-          ((-width (head parts) / 4) ^& 0)
-          ((width (head parts) / 4) ^& (-60))
-          GradPad
+      kc = keycaps `runReader` k
+      gradient = mkGradient 1 gray (w / 4)
+        where
+          w = width $ head parts
       aStyles =
         fillTexture gradient :
         fmap (\c -> fcA (c `withOpacity` 0.5)) (cycle [yellow, green, blue])
       assembly = reverse $ zipWith (\s p -> strokePath p # s) aStyles parts
-      diagram = frame 1.05 (vsep 5 (assembly ++ [mconcat assembly])) # lwO lineW
+      diagram =
+        frame 1.05 (vsep 5 (assembly ++ [mconcat $ kc : assembly])) # lwO lineW
       sizeSp = dims2D (sf * width diagram) (sf * height diagram)
    in do putStrLn $ "Generating '" ++ fname ++ "', " ++ show sizeSp
          renderSVG fname sizeSp diagram
