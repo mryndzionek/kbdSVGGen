@@ -68,9 +68,7 @@ rotP a p = apply (rotation a) (r2 p)
 roundPath :: Double -> Path V2 Double -> Path V2 Double
 roundPath = offsetPath' (with & offsetJoin .~ LineJoinRound)
 
-mirror :: (Semigroup b, Additive (V b),
-                 Num (N b), R1 (V b), Transformable b) =>
-                b -> KBD b
+mirror :: (Transformable b, Monoid b, N b ~ Double, V b ~ V2) => b -> KBD b
 mirror p = do
   isSplit <- asks _split
   return $
@@ -193,7 +191,11 @@ screwPos = do
   return [bl + (0, d), br + (-d, d), tr + (-d, -d), tl + (s / 2, -d)]
 
 placeRotated ::
-     Angle Double -> [(Double, Double)] -> Path V2 Double -> Path V2 Double
+     (Transformable b, Monoid b, N b ~ Double, V b ~ V2)
+  => Angle Double
+  -> [(Double, Double)]
+  -> b
+  -> b
 placeRotated a ps s = mconcat $ (\p -> s # translate (r2 p) # rotate a) <$> ps
 
 screwHoles :: KBD (Path V2 Double)
@@ -336,15 +338,20 @@ keycaps = do
   cs <- switchHoles cap'
   mirror cs
 
+screws :: KBD (Diagram B)
+screws = do
+  let hole = pure $ hexagonalHole 5.5 # strokePath # fcA (black `withOpacity` 0.5)
+  (placeRotated (0 @@ deg) <$> screwPos <*> hole) >>= mirror
+
 render :: KBDCfg -> IO ()
-render k =
+render k = do
   let parts =
         (`runReader` k) <$> [bottomPlate, spacerPlate, switchPlate, topPlate]
       fname = "images/" ++ show k ++ ".svg"
       dpi = 96
       sf = dpi / 25.4
       lineW = sf * 0.2
-      kc = keycaps `runReader` k
+      (kc, scrs) = over each (`runReader` k) (keycaps, screws)
       gradient = mkGradient 1 gray (w / 4)
         where
           w = width $ head parts
@@ -353,10 +360,11 @@ render k =
         fmap (\c -> fcA (c `withOpacity` 0.5)) (cycle [yellow, black, blue])
       assembly = reverse $ zipWith (\s p -> strokePath p # s) aStyles parts
       diagram =
-        frame 1.05 (vsep 5 (mconcat (kc : assembly) : assembly)) # lwO lineW
+        frame 1.05 (vsep 5 (mconcat (scrs : kc : assembly) : assembly)) #
+        lwO lineW
       sizeSp = dims2D (sf * width diagram) (sf * height diagram)
-   in do putStrLn $ "Generating '" ++ fname ++ "', " ++ show sizeSp
-         renderSVG fname sizeSp diagram
+  putStrLn $ "Generating '" ++ fname ++ "', " ++ show sizeSp
+  renderSVG fname sizeSp diagram
 
 svgToPath :: FilePath -> IO (Path V2 Double)
 svgToPath f = do
