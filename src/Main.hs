@@ -1,22 +1,22 @@
 module Main where
 
-import           Control.Lens         hiding ((#), parts, plate)
+import           Control.Lens               hiding ((#), parts, plate)
 import           Control.Monad.Reader
 
-import           Data.Function (on)
-import           Data.List     (minimumBy)
-import           Data.Maybe    (fromJust, isNothing)
+import           Data.Function              (on)
+import           Data.List                  (minimumBy)
+import           Data.Maybe                 (fromJust, isNothing)
 
 import           Diagrams.Backend.SVG
 import           Diagrams.Path
-import           Diagrams.Prelude hiding (difference, fromVertices,
-                                   intersection, parts, plate, render, sep,
-                                   trace, union, _sep)
+import           Diagrams.Prelude           hiding (difference, fromVertices,
+                                             intersection, parts, plate, render,
+                                             sep, trace, union, _sep)
 
 import           Diagrams.TwoD.Offset
 import           Diagrams.TwoD.Path.Boolean
 
-import           Graphics.SVGFonts.Text
+import qualified Graphics.Svg               as S
 
 type KBD = Reader KBDCfg
 
@@ -52,6 +52,11 @@ instance Show KBDCfg where
        else "")
 
 makeLenses ''KBDCfg
+makeLensesFor [("_elements", "sElements")] ''S.Document
+makePrisms ''S.Tree
+makeLensesFor [("_groupChildren", "groupChildren")] ''S.Group
+makeLensesFor [("_pathDefinition", "pathDefinition")] ''S.Path
+makePrisms ''S.PathCommand
 
 rotP :: Angle Double -> (Double, Double) -> V2 Double
 rotP a p = apply (rotation a) (r2 p)
@@ -335,19 +340,28 @@ render k =
       sizeSp = dims2D (sf * width diagram) (sf * height diagram)
    in renderSVG fname sizeSp diagram
 
-logo' :: Path V2 Double
-logo' =
-  let s1 =
-        alignB . center . toPath . closeLine . fromOffsets $
+svgToPath :: FilePath -> IO (Path V2 Double)
+svgToPath f = do
+  l <- fromJust <$> S.loadSvgFile f
+  let pc =
+        l ^.. sElements . traverse . _GroupTree . groupChildren . traverse .
+        _PathTree .
+        pathDefinition
+      update (o, as)
+        | o == S.OriginRelative = scanl1 (+) bs
+        | otherwise = bs
+        where
+          bs = fmap ((_2 %~ (* (-1))) . unr2) as
+      ps =
         fmap
-          (\(l, a) -> l * unitX # rotate (a @@ deg))
-          [(16, 0), (21, 110), (3, 180), (21, -110)]
-      s2 = difference Winding s1 (ellipse (7 / 10) # scale 7)
-      t = textSVG "Atreus" 1
-   in s2 # scaleUToX (0.9 * width t) <> t # translate (-unitY * pure (height t))
+          ((mconcat . fmap update) .
+           (^.. traverse . (_MoveTo `failing` _LineTo)))
+          pc
+  return . center . hsep 3 $ fmap (center . fromVertices . fmap p2) ps
 
 main :: IO ()
 main = do
+  l <- svgToPath "logo.svg"
   let ang = 10 @@ deg
       atreus42 =
         KBDCfg
@@ -367,7 +381,7 @@ main = do
           , _sep = 40
           , _hooks = False
           , _split = False
-          , _logo = Just (35, 45, logo')
+          , _logo = Just (35, 45, l)
           }
       atreus44 = atreus42 & nThumb .~ 2
       atreus50 = atreus42 & nCols .~ 6

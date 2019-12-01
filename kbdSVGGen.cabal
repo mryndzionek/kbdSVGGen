@@ -20,4 +20,5 @@ executable kbdSVGGen
   default-language:    Haskell2010
   extensions:          OverloadedStrings, TemplateHaskell
   build-depends:       base >= 4.7 && < 5, sort, diagrams, diagrams-lib,
-                       diagrams-svg, diagrams-contrib, SVGFonts, mtl, lens
+                       diagrams-svg, diagrams-contrib, SVGFonts, svg-tree,
+                       mtl, lens
