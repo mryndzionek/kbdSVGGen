@@ -349,7 +349,7 @@ render k =
           w = width $ head parts
       aStyles =
         fillTexture gradient :
-        fmap (\c -> fcA (c `withOpacity` 0.5)) (cycle [yellow, green, blue])
+        fmap (\c -> fcA (c `withOpacity` 0.5)) (cycle [yellow, black, blue])
       assembly = reverse $ zipWith (\s p -> strokePath p # s) aStyles parts
       diagram =
         frame 1.05 (vsep 5 (assembly ++ [mconcat $ kc : assembly])) # lwO lineW
