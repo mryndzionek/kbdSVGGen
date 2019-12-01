@@ -68,13 +68,18 @@ rotP a p = apply (rotation a) (r2 p)
 roundPath :: Double -> Path V2 Double -> Path V2 Double
 roundPath = offsetPath' (with & offsetJoin .~ LineJoinRound)
 
-mirror :: Path V2 Double -> KBD (Path V2 Double)
+mirror :: (Semigroup b, Additive (V b),
+                 Num (N b), R1 (V b), Transformable b) =>
+                b -> KBD b
 mirror p = do
   isSplit <- asks _split
-  return . union Winding $
+  return $
     if isSplit
-      then reversePath p
-      else p <> p # reversePath # reflectX
+      then p
+      else p <> p # reflectX
+
+mirrorP :: Path V2 Double -> KBD (Path V2 Double)
+mirrorP p = union Winding <$> mirror p
 
 fromVertices :: (Metric v, Floating n, Ord n) => [Point v n] -> Path v n
 fromVertices ps =
@@ -194,7 +199,7 @@ placeRotated a ps s = mconcat $ (\p -> s # translate (r2 p) # rotate a) <$> ps
 screwHoles :: KBD (Path V2 Double)
 screwHoles = do
   let hole = asks _screwHole <*> asks _screwSize
-  (placeRotated (0 @@ deg) <$> screwPos <*> hole) >>= mirror
+  (placeRotated (0 @@ deg) <$> screwPos <*> hole) >>= mirrorP
 
 outlinePos :: KBD [(Double, Double)]
 outlinePos = do
@@ -228,7 +233,7 @@ outline :: KBD (Path V2 Double)
 outline = do
   k <- ask
   vs2 <- outlinePos
-  roundPath (-_washerSize k / 4) <$> (adjP (p2 <$> vs2) # mirror)
+  roundPath (-_washerSize k / 4) <$> (adjP (p2 <$> vs2) # mirrorP)
 
 bottomPlate :: KBD (Path V2 Double)
 bottomPlate = do
@@ -255,7 +260,7 @@ addHooks p = do
         roundPath (-0.5) #
         rotate a #
         moveTo hp
-  mappend p <$> mirror hook
+  mappend p <$> mirrorP hook
 
 switchPlate :: KBD (Path V2 Double)
 switchPlate = do
@@ -265,7 +270,7 @@ switchPlate = do
     (if hasHooks
        then bottomPlate >>= addHooks
        else bottomPlate) <*>
-    (hole >>= switchHoles >>= mirror)
+    (hole >>= switchHoles >>= mirrorP)
 
 topPlate :: KBD (Path V2 Double)
 topPlate = do
@@ -285,7 +290,7 @@ topPlate = do
            in (l' # scaleUToX w # translate (pure d * unitY) :: Path V2 Double) <>
               (p # reversePath)
   let mask = roundPath (-1) . union Winding $ inner
-  addLogo lg <$> (difference Winding bp <$> mirror mask)
+  addLogo lg <$> (difference Winding bp <$> mirrorP mask)
 
 spacerPlate :: KBD (Path V2 Double)
 spacerPlate = do
@@ -312,7 +317,7 @@ spacerPlate = do
                    then w / 2
                    else 0)
                 (c2 - c1)))
-  plate <- intersection Winding o <$> (mappend fr <$> mirror disks)
+  plate <- intersection Winding o <$> (mappend fr <$> mirrorP disks)
   return $ difference Winding plate sh
 
 mkGradient :: Fractional n => Double -> Colour Double -> n -> Texture n
@@ -329,11 +334,7 @@ keycaps = do
         (cap (hs - 5) # strokePath # fillTexture (mkGradient 0.1 black 5)) <>
         (cap (hs + 0.7) # strokePath # style black 0.7)
   cs <- switchHoles cap'
-  isSplit <- asks _split
-  return $
-    if isSplit
-      then cs
-      else cs <> cs # reflectX
+  mirror cs
 
 render :: KBDCfg -> IO ()
 render k =
