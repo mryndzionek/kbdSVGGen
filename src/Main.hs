@@ -352,7 +352,7 @@ render k =
         fmap (\c -> fcA (c `withOpacity` 0.5)) (cycle [yellow, black, blue])
       assembly = reverse $ zipWith (\s p -> strokePath p # s) aStyles parts
       diagram =
-        frame 1.05 (vsep 5 (assembly ++ [mconcat $ kc : assembly])) # lwO lineW
+        frame 1.05 (vsep 5 (mconcat (kc : assembly) : assembly)) # lwO lineW
       sizeSp = dims2D (sf * width diagram) (sf * height diagram)
    in do putStrLn $ "Generating '" ++ fname ++ "', " ++ show sizeSp
          renderSVG fname sizeSp diagram
