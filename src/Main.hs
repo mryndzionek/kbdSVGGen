@@ -416,9 +416,11 @@ main = do
         atreus52h & split .~ True & hooks .~ False & angle .~ (0 @@ deg)
       atreus62 = atreus50 & nRows .~ 5
       atreus62s = atreus62 & split .~ True
-      atreus206 = atreus42 & nCols .~ 10 & nRows .~ 10 & nThumb .~ 3
+      atreus206 =
+        atreus42 & nCols .~ 10 & nRows .~ 10 & nThumb .~ 3 &
+        (logo ?~ (60, 80, l))
       atreus208 = atreus206 & nThumb .~ 4
-      atreus210 = atreus208 & nThumb .~ 5
+      atreus210 = atreus208 & nThumb .~ 5 & (logo ?~ (80, 90, l))
       ks =
         [ atreus42
         , atreus44
