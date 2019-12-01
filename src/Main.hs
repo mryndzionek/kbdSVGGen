@@ -1,6 +1,7 @@
 module Main where
 
 import           Control.Lens               hiding ((#), parts, plate)
+import qualified Control.Monad.Parallel     as P
 import           Control.Monad.Reader
 
 import           Data.Function              (on)
@@ -103,7 +104,8 @@ tpos n = do
     , (if _nThumb k > 1 && odd (_nThumb k) && (n == 0)
          then 0
          else _columnSpacing k / 2) -
-      snd (lut !! n) * _columnSpacing k)
+      snd (lut !! n) *
+      _columnSpacing k)
 
 kpos :: Int -> Int -> KBD (Double, Double)
 kpos m n = do
@@ -128,8 +130,7 @@ switchHoleNotched s =
   let notchWidth = 3.5001
       notchOffset = 4.2545
       notchDepth = 0.8128
-   in union Winding $
-      switchHoleSquare s <> rect (s + 2 * notchDepth) notchWidth #
+   in union Winding $ switchHoleSquare s <> rect (s + 2 * notchDepth) notchWidth #
       translate (V2 0 notchOffset) <>
       rect (s + 2 * notchDepth) notchWidth #
       translate (V2 0 (-notchOffset))
@@ -149,25 +150,24 @@ boundaryPos = do
     , srt (^. _y) compare
     , srt (^. _y) $ flip compare)
 
-switchHolesPos :: [Int] -> [Int] -> [Int] -> KBD [(Double, Double)]
-switchHolesPos xr yr tr = do
-  keys <- sequence [kpos x y | x <- xr, y <- yr]
-  tkeys <- sequence [tpos i | i <- tr]
-  return $ keys ++ tkeys
-
 allSwitchHolesPos :: KBD [(Double, Double)]
 allSwitchHolesPos = do
-  k <- ask
-  switchHolesPos [0 .. _nCols k - 1] [0 .. _nRows k - 1] [0 .. _nThumb k - 1]
+  (nc, nr, nt) <- traverseOf each asks (_nCols, _nRows, _nThumb)
+  shp [0 .. nc - 1] [0 .. nr - 1] [0 .. nt - 1]
+  where
+    shp xr yr tr = do
+      keys <- sequence [kpos x y | x <- xr, y <- yr]
+      tkeys <- sequence [tpos i | i <- tr]
+      return $ keys ++ tkeys
 
 switchHoles :: Path V2 Double -> KBD (Path V2 Double)
 switchHoles hole = do
   k <- ask
   ashp <- allSwitchHolesPos
   let keys =
-        rotate (_angle k) $
-        union Winding $
-        mconcat $ (\(x, y) -> hole # translate (V2 x y)) <$> ashp
+        rotate (_angle k) $ union Winding $ mconcat $
+        (\(x, y) -> hole # translate (V2 x y)) <$>
+        ashp
   mirror keys
 
 roundHole :: Double -> Path V2 Double
@@ -203,8 +203,8 @@ outlinePos = do
   let dx = _rowSpacing k - 2
       dy = _columnSpacing k / 3 - 1
       w =
-        (maxx ^. _x) - (minx ^. _x) + _sep k / 2 + dx / 2 +
-        _switchHoleSize k / 2
+        (maxx ^. _x) - (minx ^. _x) + _sep k / 2 + dx / 2 + _switchHoleSize k /
+        2
       h = (maxy ^. _y) - (miny ^. _y) + 2 * dy + _switchHoleSize k
       r =
         rect w h # alignBL # translate (r2 (0, -_switchHoleSize k / 2 - dy / 2))
@@ -338,7 +338,8 @@ render k =
       assembly = reverse $ zipWith (\s p -> strokePath p # s) aStyles parts
       diagram = frame 1.05 (vsep 5 (assembly ++ [mconcat assembly])) # lwO lineW
       sizeSp = dims2D (sf * width diagram) (sf * height diagram)
-   in renderSVG fname sizeSp diagram
+   in do putStrLn $ "Generating '" ++ fname ++ "', " ++ show sizeSp
+         renderSVG fname sizeSp diagram
 
 svgToPath :: FilePath -> IO (Path V2 Double)
 svgToPath f = do
@@ -405,4 +406,4 @@ main = do
         , atreus208
         , atreus210
         ]
-  mapM_ render ks
+  P.mapM_ render ks
