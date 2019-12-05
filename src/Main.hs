@@ -7,6 +7,8 @@ import           Control.Lens               hiding ((#), parts, plate)
 import qualified Control.Monad.Parallel     as P
 import           Control.Monad.Reader
 
+import           System.Process
+
 import           Data.Function              (on)
 import           Data.List                  (minimumBy)
 import           Data.Maybe                 (fromJust, isNothing)
@@ -22,7 +24,6 @@ import           Diagrams.TwoD.Offset
 import           Diagrams.TwoD.Path.Boolean
 
 import qualified Graphics.Svg               as S
-
 
 type KBD = Reader KBDCfg
 
@@ -369,6 +370,15 @@ render k = do
         renderSVG n sp d
   generate ("images/" ++ show k ++ ".svg") project
   generate ("images/" ++ show k ++ "_a.svg") assembly
+  callProcess
+    "blender"
+    [ "--background"
+    , "--factory-startup"
+    , "--python"
+    , "svgto3dpng.py"
+    , "--"
+    , "images/" ++ show k ++ "_a.svg"
+    ]
 
 svgToPath :: FilePath -> IO (Path V2 Double)
 svgToPath f = do
