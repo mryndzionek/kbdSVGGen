@@ -1,0 +1,22 @@
+name: CI
+
+on: [push]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Setup Stack
+      uses: mstksg/setup-stack@v1
+    
+    - name: Checkout
+      uses: actions/checkout@v2-beta
+      
+    - name: Build
+      run: |
+        set -ex
+        stack build && time stack exec kbdSVGGen
+        set +ex
+

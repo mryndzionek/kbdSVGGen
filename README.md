@@ -4,6 +4,8 @@
 ## :warning: The generated files were not (yet) used to build an actual keyboard !
 ## :warning: Do not trust the generated files !
 
+![status](https://github.com/mryndzionek/kbdSVGGen/workflows/CI/badge.svg)
+
 This is another attempt at generating mechanical keyboard design files programmatically.
 Previous one is [here](https://github.com/mryndzionek/h-atreus).
 I had a felling that [diagrams](http://hackage.haskell.org/package/diagrams) offered everything
@@ -29,7 +31,6 @@ stack build && stack exec kbdSVGGen
 
 TODO
 ----
-  - [?] refactor the code to use lenses more
   - [ ] places for connectors
   - [x] 'split' option
   - [ ] simple web UI interface
