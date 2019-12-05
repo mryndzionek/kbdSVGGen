@@ -14,13 +14,15 @@ import           Data.Maybe                 (fromJust, isNothing)
 import           Diagrams.Backend.SVG
 import           Diagrams.Path
 import           Diagrams.Prelude           hiding (difference, fromVertices,
-                                             intersection, parts, plate, render,
-                                             sep, trace, union, _sep)
+                                             intersection, parts, plate,
+                                             project, render, sep, trace, union,
+                                             _sep)
 
 import           Diagrams.TwoD.Offset
 import           Diagrams.TwoD.Path.Boolean
 
 import qualified Graphics.Svg               as S
+
 
 type KBD = Reader KBDCfg
 
@@ -235,7 +237,7 @@ outline :: KBD (Path V2 Double)
 outline = do
   k <- ask
   vs2 <- outlinePos
-  roundPath (-_washerSize k / 4) <$> (adjP (p2 <$> vs2) # mirrorP)
+  roundPath (-_washerSize k / 3) <$> (adjP (p2 <$> vs2) # mirrorP)
 
 bottomPlate :: KBD (Path V2 Double)
 bottomPlate = do
@@ -340,17 +342,17 @@ keycaps = do
 
 screws :: KBD (Diagram B)
 screws = do
-  let hole = pure $ hexagonalHole 5.5 # strokePath # fcA (black `withOpacity` 0.5)
+  let hole =
+        pure $ hexagonalHole 5.5 # strokePath # fcA (black `withOpacity` 0.5)
   (placeRotated (0 @@ deg) <$> screwPos <*> hole) >>= mirror
 
 render :: KBDCfg -> IO ()
 render k = do
   let parts =
         (`runReader` k) <$> [bottomPlate, spacerPlate, switchPlate, topPlate]
-      fname = "images/" ++ show k ++ ".svg"
       dpi = 96
       sf = dpi / 25.4
-      lineW = sf * 0.2
+      lineW = sf * 0.1
       (kc, scrs) = over each (`runReader` k) (keycaps, screws)
       gradient = mkGradient 1 gray (w / 4)
         where
@@ -358,13 +360,16 @@ render k = do
       aStyles =
         fillTexture gradient :
         fmap (\c -> fcA (c `withOpacity` 0.5)) (cycle [yellow, black, blue])
-      assembly = reverse $ zipWith (\s p -> strokePath p # s) aStyles parts
-      diagram =
-        frame 1.05 (vsep 5 (mconcat (scrs : kc : assembly) : assembly)) #
-        lwO lineW
-      sizeSp = dims2D (sf * width diagram) (sf * height diagram)
-  putStrLn $ "Generating '" ++ fname ++ "', " ++ show sizeSp
-  renderSVG fname sizeSp diagram
+      diagram = reverse $ zipWith (\s p -> strokePath p # s) aStyles parts
+      project = frame 1.05 (vsep 5 diagram) # lwO lineW
+      assembly = frame 1.05 $ mconcat (scrs : kc : diagram) # lwO lineW
+      sizeSp d = dims2D (sf * width d) (sf * height d)
+      generate n d = do
+        let sp = sizeSp d
+        putStrLn $ "Generating '" ++ n ++ "', " ++ show sp
+        renderSVG n sp d
+  generate ("images/" ++ show k ++ ".svg") project
+  generate ("images/" ++ show k ++ "_a.svg") assembly
 
 svgToPath :: FilePath -> IO (Path V2 Double)
 svgToPath f = do
@@ -384,6 +389,21 @@ svgToPath f = do
            (^.. traverse . (_MoveTo `failing` _LineTo)))
           pc
   return . center . hsep 3 $ fmap (center . fromVertices . fmap p2) ps
+
+gallery :: (Foldable t, Show a) => t a -> IO ()
+gallery ks =
+  let gen k =
+        let entry = show k
+         in unlines
+              [ "## " ++ entry ++ "\n"
+              , "Rendered in Blender\n"
+              , "![" ++ entry ++ "3d](images/" ++ entry ++ "_a.png)\n"
+              , "[" ++ entry ++ " STL file](images/" ++ entry ++ "_a.stl)\n"
+              , "SVG files for CNC cutting\n"
+              , "![" ++ entry ++ "a](images/" ++ entry ++ "_a.svg)\n"
+              , "![" ++ entry ++ "](images/" ++ entry ++ ".svg)\n"
+              ]
+   in writeFile "GALLERY.md" $ "# Gallery\n\n" ++ (concatMap gen ks)
 
 main :: IO ()
 main = do
@@ -409,6 +429,12 @@ main = do
           , _split = False
           , _logo = Just (35, 45, l)
           }
+      smallBase =
+        atreus42 & nThumb .~ 0 & logo .~ Nothing & angle .~ (0 @@ deg) &
+        staggering .~
+        repeat 0
+      atreus12 = smallBase & nRows .~ 1 & nCols .~ 6 & sep .~ 25
+      atreus32 = smallBase & nRows .~ 4 & nCols .~ 4
       atreus44 = atreus42 & nThumb .~ 2
       atreus50 = atreus42 & nCols .~ 6
       atreus52h = atreus50 & nThumb .~ 2 & hooks .~ True
@@ -422,7 +448,9 @@ main = do
       atreus208 = atreus206 & nThumb .~ 4
       atreus210 = atreus208 & nThumb .~ 5 & (logo ?~ (80, 90, l))
       ks =
-        [ atreus42
+        [ atreus12
+        , atreus32
+        , atreus42
         , atreus44
         , atreus50
         , atreus52h
@@ -433,4 +461,5 @@ main = do
         , atreus208
         , atreus210
         ]
+  gallery ks
   P.mapM_ render ks
