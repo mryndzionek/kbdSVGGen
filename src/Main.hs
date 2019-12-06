@@ -403,7 +403,7 @@ gallery ks =
               , "![" ++ entry ++ "a](images/" ++ entry ++ "_a.svg)\n"
               , "![" ++ entry ++ "](images/" ++ entry ++ ".svg)\n"
               ]
-   in writeFile "GALLERY.md" $ "# Gallery\n\n" ++ (concatMap gen ks)
+   in writeFile "GALLERY.md" $ "# Gallery\n\n" ++ concatMap gen ks
 
 main :: IO ()
 main = do
