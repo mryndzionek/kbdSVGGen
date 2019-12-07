@@ -31,7 +31,7 @@ def create(fp):
 
     mm = 0.001
     heights = [3.0 * mm, 6.0 * mm, 1.5 * mm, 3.0 * mm]
-    gap = 0.1 * mm
+    gap = 0.05 * mm
 
     for obj in objs[len(heights):]:
         obj.select_set(True)
@@ -52,9 +52,9 @@ def create(fp):
         bpy.ops.mesh.extrude_region_move(
             TRANSFORM_OT_translate={"value":(0, 0, h)}
         )
-
+		
         bpy.ops.object.mode_set(mode='OBJECT')
-        
+
         bpy.ops.transform.translate(value = (0, 0, a), constraint_axis = (True, True, True))
         a += h + gap
         
@@ -78,6 +78,18 @@ def move():
     bpy.context.scene.cursor.location = kbd.location
     bpy.ops.object.origin_set(type='ORIGIN_GEOMETRY')
     bpy.ops.transform.translate(value=(-kbd.location.x, -kbd.location.y, 0))
+
+def set_transparency(alpha):
+	objs = get_objects(['MESH'])
+	for obj in objs:
+		if obj.active_material == None:
+			obj.active_material = bpy.data.materials.new(name="SVGMat")
+			obj.active_material.blend_method = 'CLIP'
+		else:
+			obj.active_material.blend_method = 'BLEND'
+		obj.active_material.use_nodes = True
+		obj.active_material.node_tree.nodes["Principled BSDF"].inputs[18].default_value = alpha
+
     
 def adjust_view():
     # move camera closer
@@ -118,6 +130,7 @@ rp = os.path.splitext(fp)[0]
 prepare()
 create(fp)
 move()
+set_transparency(0.5)
 adjust_view()
 render(rp)
 export(rp)
