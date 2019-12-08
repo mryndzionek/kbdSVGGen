@@ -79,16 +79,15 @@ def move():
     bpy.ops.object.origin_set(type='ORIGIN_GEOMETRY')
     bpy.ops.transform.translate(value=(-kbd.location.x, -kbd.location.y, 0))
 
-def set_transparency(alpha):
+def adjust_materials():
 	objs = get_objects(['MESH'])
 	for obj in objs:
 		if obj.active_material == None:
 			obj.active_material = bpy.data.materials.new(name="SVGMat")
-			obj.active_material.blend_method = 'CLIP'
-		else:
+		elif obj.name == 'Curve.001':
 			obj.active_material.blend_method = 'BLEND'
-		obj.active_material.use_nodes = True
-		obj.active_material.node_tree.nodes["Principled BSDF"].inputs[18].default_value = alpha
+			obj.active_material.use_nodes = True
+			obj.active_material.node_tree.nodes["Principled BSDF"].inputs[18].default_value = 0.8
 
     
 def adjust_view():
@@ -130,7 +129,7 @@ rp = os.path.splitext(fp)[0]
 prepare()
 create(fp)
 move()
-set_transparency(0.5)
+adjust_materials()
 adjust_view()
 render(rp)
 export(rp)
