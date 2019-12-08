@@ -291,7 +291,7 @@ topPlate = do
         | isNothing l || isSplit = p
         | otherwise =
           let (w, d, l') = fromJust l
-           in (l' # scaleUToX w # translate (pure d * unitY) :: Path V2 Double) <>
+           in (l' # scaleUToX w # translate (pure d * unitY)) <>
               (p # reversePath)
   let mask = roundPath (-1) . union Winding $ inner
   addLogo lg <$> (difference Winding bp <$> mirrorP mask)
@@ -306,7 +306,6 @@ spacerPlate = do
       punch = o # scaleToX (width o - w) # scaleToY (height o - w) # reversePath
       (c1, c2) = (cntr punch ^. _y, cntr o ^. _y)
         where
-          cntr :: Path V2 Double -> Point V2 Double
           cntr p = fromJust (mCenterPoint p)
       disks =
         union Winding $ placeRotated (0 @@ deg) sp (circle (_washerSize k / 3))
