@@ -20,3 +20,7 @@ jobs:
         stack build && time stack exec kbdSVGGen
         set +ex
 
+    - uses: actions/upload-artifact@v1.0.0
+      with:
+        name: images
+        path: images
