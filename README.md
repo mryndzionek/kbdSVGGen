@@ -26,7 +26,7 @@ Full gallery [here](GALLERY.md).
   <img src="gifs/blender_2.gif">
 </p>
 
-![atreus423d](images/atreus42_a.png)
+![atreus423d](images/atreus42_show.png)
 ![atreus42a](images/atreus42_a.svg)
 ![atreus42](images/atreus42.svg)
 
