@@ -44,43 +44,37 @@ def create(fp):
         
         obj.select_set(True)
 
-        bpy.ops.object.convert(target='MESH')
         bpy.ops.object.mode_set(mode='EDIT')
-        bpy.ops.mesh.select_mode(type='FACE')
-        bpy.ops.mesh.select_all(action='SELECT')
-
-        bpy.ops.mesh.extrude_region_move(
-            TRANSFORM_OT_translate={"value":(0, 0, h)}
-        )
-		
+        obj_data = obj.data
+        obj_data.extrude = h / 2
         bpy.ops.object.mode_set(mode='OBJECT')
 
-        bpy.ops.transform.translate(value = (0, 0, a), constraint_axis = (True, True, True))
+        bpy.ops.transform.translate(value = (0, 0, a + (h / 2)), constraint_axis = (True, True, True))
         a += h + gap
         
         obj.select_set(False)
         
 def join():
-    objs = get_objects(['MESH'])
+    objs = get_objects(['CURVE'])
     for obj in objs:
         obj.select_set(True)
     bpy.ops.object.join()
     
 def move():
     # center the keyboard in x and y
-    objs = get_objects(['MESH'])
+    objs = get_objects(['CURVE'])
 
     for obj in objs:
         obj.select_set(True)
 
-    objs = get_objects(['MESH'])
+    objs = get_objects(['CURVE'])
     kbd = list(objs)[0]
     bpy.context.scene.cursor.location = kbd.location
     bpy.ops.object.origin_set(type='ORIGIN_GEOMETRY')
     bpy.ops.transform.translate(value=(-kbd.location.x, -kbd.location.y, 0))
 
 def adjust_materials():
-	objs = get_objects(['MESH'])
+	objs = get_objects(['CURVE'])
 	for obj in objs:
 		if obj.active_material == None:
 			obj.active_material = bpy.data.materials.new(name="SVGMat")
