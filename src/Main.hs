@@ -24,6 +24,8 @@ import           Diagrams.TwoD.Offset
 import           Diagrams.TwoD.Path.Boolean
 
 import qualified Graphics.Svg               as S
+import           System.Directory           (findExecutable)
+
 
 type KBD = Reader KBDCfg
 
@@ -370,15 +372,21 @@ render k = do
         renderSVG n sp d
   generate ("images/" ++ show k ++ ".svg") project
   generate ("images/" ++ show k ++ "_a.svg") assembly
-  callProcess
-    "blender"
-    [ "--background"
-    , "--factory-startup"
-    , "--python"
-    , "svgto3dpng.py"
-    , "--"
-    , "images/" ++ show k ++ "_a.svg"
-    ]
+  blp <- findExecutable "blender"
+  case blp of
+    Just fp ->
+      callProcess
+        fp
+        [ "--background"
+        , "-e"
+        , "CYCLES"
+        , "--factory-startup"
+        , "--python"
+        , "svgto3dpng.py"
+        , "--"
+        , "images/" ++ show k ++ "_a.svg"
+        ]
+    Nothing -> return ()
 
 svgToPath :: FilePath -> IO (Path V2 Double)
 svgToPath f = do

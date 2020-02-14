@@ -8,6 +8,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+
     - name: Setup Stack
       uses: mstksg/setup-stack@v1
     
@@ -24,3 +25,4 @@ jobs:
       with:
         name: images
         path: images
+
