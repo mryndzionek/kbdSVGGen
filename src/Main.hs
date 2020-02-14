@@ -46,6 +46,7 @@ data KBDCfg = KBDCfg
   , _sep            :: Double
   , _hooks          :: Bool
   , _split          :: Bool
+  , _topNotch       :: Bool
   , _logo           :: Maybe (Double, Double, Path V2 Double)
   }
 
@@ -188,12 +189,25 @@ hexagonalHole d =
 
 screwPos :: KBD [(Double, Double)]
 screwPos = do
-  s <- asks _sep
+  let s = 80
+  sp <- asks _sep
   sw <- asks _spacerWidth
+  tn <- asks _topNotch
+  isSplit <- asks _split
   ps <- outlinePos
   let d = (sw / 2) - 2
       (br, tr, tl, bl) = (head ps, ps !! 1, ps !! 2, ps !! 4)
-  return [bl + (0, d), br + (-d, d), tr + (-d, -d), tl + (s / 2, -d)]
+  return
+    [ bl + (0, d)
+    , br + (-d, d)
+    , tr + (-d, -d)
+    , tl +
+      ( (if tn && not isSplit
+           then s
+           else sp) /
+        2
+      , -d)
+    ]
 
 placeRotated ::
      (Transformable b, Monoid b, N b ~ Double, V b ~ V2)
@@ -221,8 +235,8 @@ outlinePos = do
       r =
         rect w h # alignBL # translate (r2 (0, -_switchHoleSize k / 2 - dy / 2))
       rot' = papply (rotation $ _angle k)
-      pt1 = rot' miny - p2 (0, _switchHoleSize k / 2 + dy + 3)
-      pt2 = rot' maxy + p2 (0, _switchHoleSize k / 2 + dy + 2)
+      pt1 = rot' miny - p2 (0, _switchHoleSize k / 2 + dy + 4)
+      pt2 = rot' maxy + p2 (0, _switchHoleSize k / 2 + dy + 3)
       r' = r # rotate (_angle k)
       ps = toVertices r'
       vs1 =
@@ -238,9 +252,25 @@ outlinePos = do
 
 outline :: KBD (Path V2 Double)
 outline = do
-  k <- ask
+  ws <- asks _washerSize
+  isSplit <- asks _split
+  tn <- asks _topNotch
   vs2 <- outlinePos
-  roundPath (-_washerSize k / 3) <$> (adjP (p2 <$> vs2) # mirrorP)
+  let s = adjP (p2 <$> vs2)
+      t =
+        if isSplit || not tn
+          then s
+          else let r = 50
+                   dpt = 10 :: Double
+                   tp =
+                     fromJust (maxTraceP (mkP2 0 0) unitY s) #
+                     translate (-unitY * pure dpt)
+                   notch =
+                     circle r # reversePath #
+                     translate (unitY * pure (r - dpt / 2)) #
+                     moveTo tp
+                in difference Winding s notch
+  roundPath (-ws / 3) <$> (t # mirrorP)
 
 bottomPlate :: KBD (Path V2 Double)
 bottomPlate = do
@@ -444,6 +474,7 @@ main = do
           , _sep = 40
           , _hooks = False
           , _split = False
+          , _topNotch = False
           , _logo = Just (35, 45, l)
           }
       smallBase =
@@ -453,7 +484,7 @@ main = do
       atreus12 = smallBase & nRows .~ 1 & nCols .~ 6 & sep .~ 25
       atreus32 = smallBase & nRows .~ 4 & nCols .~ 4
       atreus44 = atreus42 & nThumb .~ 2
-      atreus50 = atreus42 & nCols .~ 6
+      atreus50 = atreus42 & nCols .~ 6 & topNotch .~ True
       atreus52h = atreus50 & nThumb .~ 2 & hooks .~ True
       atreus52s =
         atreus52h & split .~ True & hooks .~ False & angle .~ (0 @@ deg)
@@ -461,7 +492,7 @@ main = do
       atreus62s = atreus62 & split .~ True
       atreus206 =
         atreus42 & nCols .~ 10 & nRows .~ 10 & nThumb .~ 3 &
-        (logo ?~ (60, 80, l))
+        (logo ?~ (60, 80, l)) & topNotch .~ True
       atreus208 = atreus206 & nThumb .~ 4
       atreus210 = atreus208 & nThumb .~ 5 & (logo ?~ (80, 90, l))
       ks =
@@ -480,3 +511,4 @@ main = do
         ]
   gallery ks
   P.mapM_ render ks
+
