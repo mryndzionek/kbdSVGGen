@@ -9,9 +9,13 @@ import           Control.Monad.Reader
 
 import           System.Process
 
-import           Data.Function              (on)
-import           Data.List                  (minimumBy)
-import           Data.Maybe                 (fromJust, isNothing)
+import           Data.Function    (on)
+import           Data.List        (minimumBy)
+import           Data.Maybe       (fromJust, isNothing)
+import           Data.Time.Clock
+import           Data.Time.Format
+import           Data.UUID        (UUID, toString)
+import           Data.UUID.V1     (nextUUID)
 
 import           Diagrams.Backend.SVG
 import           Diagrams.Path
@@ -24,8 +28,10 @@ import           Diagrams.TwoD.Offset
 import           Diagrams.TwoD.Path.Boolean
 
 import qualified Graphics.Svg               as S
-import           System.Directory           (findExecutable)
+import           Graphics.SVGFonts
+import           Graphics.SVGFonts.ReadFont (PreparedFont)
 
+import           System.Directory  (findExecutable)
 
 type KBD = Reader KBDCfg
 
@@ -48,6 +54,9 @@ data KBDCfg = KBDCfg
   , _split          :: Bool
   , _topNotch       :: Bool
   , _logo           :: Maybe (Double, Double, Path V2 Double)
+  , _textFont       :: PreparedFont Double
+  , _date           :: String
+  , _uuid           :: UUID
   }
 
 instance Show KBDCfg where
@@ -189,7 +198,6 @@ hexagonalHole d =
 
 screwPos :: KBD [(Double, Double)]
 screwPos = do
-  let s = 80
   sp <- asks _sep
   sw <- asks _spacerWidth
   tn <- asks _topNotch
@@ -202,11 +210,9 @@ screwPos = do
     , br + (-d, d)
     , tr + (-d, -d)
     , tl +
-      ( (if tn && not isSplit
-           then s
-           else sp) /
-        2
-      , -d)
+      (if tn && not isSplit
+         then (15, -16)
+         else (sp / 2, -d))
     ]
 
 placeRotated ::
@@ -260,8 +266,8 @@ outline = do
       t =
         if isSplit || not tn
           then s
-          else let r = 50
-                   dpt = 10 :: Double
+          else let r = 75
+                   dpt = 12 :: Double
                    tp =
                      fromJust (maxTraceP (mkP2 0 0) unitY s) #
                      translate (-unitY * pure dpt)
@@ -309,6 +315,18 @@ switchPlate = do
        else bottomPlate) <*>
     (hole >>= switchHoles >>= mirrorP)
 
+serialNumber :: KBD (Path V2 Double)
+serialNumber = do
+  f <- asks _textFont
+  n <- asks show
+  d <- asks _date
+  u <- toString <$> asks _uuid
+  let t = ["MODEL: " ++ n, "SN   : " ++ u, "DATE : " ++ d]
+      s = replicate (maximum (map length t)) '-'
+      txt2svg t' =
+        textSVG' (TextOpts f INSIDE_H KERN False 1 1) t' # reversePath # alignL
+  return $ alignT $ center $ vsep 0.4 (map txt2svg (s : t ++ [s]))
+
 topPlate :: KBD (Path V2 Double)
 topPlate = do
   (sh, rs, cs) <-
@@ -318,6 +336,7 @@ topPlate = do
   ashp <- allSwitchHolesPos
   bp <- bottomPlate
   isSplit <- asks _split
+  sn <- serialNumber
   let innerR = rect (sh + rs / 4 + 1) (sh + cs / 4 + 1)
       inner = placeRotated a ashp innerR
       addLogo l p
@@ -326,8 +345,12 @@ topPlate = do
           let (w, d, l') = fromJust l
            in (l' # scaleUToX w # translate (pure d * unitY)) <>
               (p # reversePath)
-  let mask = roundPath (-1) . union Winding $ inner
-  addLogo lg <$> (difference Winding bp <$> mirrorP mask)
+      mask = roundPath (-1) . union Winding $ inner
+  lg' <- addLogo lg <$> (difference Winding bp <$> mirrorP mask)
+  return $
+    if isNothing lg || isSplit
+      then lg'
+      else addLogo (Just (35, 40, sn)) lg'
 
 spacerPlate :: KBD (Path V2 Double)
 spacerPlate = do
@@ -335,7 +358,7 @@ spacerPlate = do
   o <- outline
   sp <- screwPos
   sh <- screwHoles
-  let w = 2 * _spacerWidth k
+  let w = 2.5 * _spacerWidth k
       punch = o # scaleToX (width o - w) # scaleToY (height o - w) # reversePath
       (c1, c2) = (cntr punch ^. _y, cntr o ^. _y)
         where
@@ -455,6 +478,10 @@ gallery ks =
 main :: IO ()
 main = do
   l <- svgToPath "logo.svg"
+  f <- bit
+  now <- getCurrentTime
+  let ds = formatTime defaultTimeLocale "%Y/%m/%d %H:%M:%S.%3q" now
+  u <- fromJust <$> nextUUID
   let ang = 10 @@ deg
       atreus42 =
         KBDCfg
@@ -476,6 +503,9 @@ main = do
           , _split = False
           , _topNotch = False
           , _logo = Just (35, 45, l)
+          , _textFont = f
+          , _date = ds
+          , _uuid = u
           }
       smallBase =
         atreus42 & nThumb .~ 0 & logo .~ Nothing & angle .~ (0 @@ deg) &
@@ -492,7 +522,9 @@ main = do
       atreus62s = atreus62 & split .~ True
       atreus206 =
         atreus42 & nCols .~ 10 & nRows .~ 10 & nThumb .~ 3 &
-        (logo ?~ (60, 80, l)) & topNotch .~ True
+        (logo ?~ (60, 80, l)) &
+        topNotch .~
+        True
       atreus208 = atreus206 & nThumb .~ 4
       atreus210 = atreus208 & nThumb .~ 5 & (logo ?~ (80, 90, l))
       ks =
