@@ -358,6 +358,7 @@ spacerPlate = do
   o <- outline
   sp <- screwPos
   sh <- screwHoles
+  isSplit <- asks _split
   let w = 2.5 * _spacerWidth k
       punch = o # scaleToX (width o - w) # scaleToY (height o - w) # reversePath
       (c1, c2) = (cntr punch ^. _y, cntr o ^. _y)
@@ -376,8 +377,19 @@ spacerPlate = do
                    then w / 2
                    else 0)
                 (c2 - c1)))
+      tp = fromJust (maxTraceP (mkP2 0 0) unitY o)
   plate <- intersection Winding o <$> (mappend fr <$> mirrorP disks)
-  return $ difference Winding plate sh
+  let r = rect 20 8 # reversePath # roundPath (-2) # alignT # moveTo tp
+      r1 =
+        mconcat
+          (rect 3 40 : map (\a -> rect 5 1 # translateY a) [-20,-18 .. 20]) #
+        moveTo tp
+      plate2 = Winding `union` (plate <> r)
+      plate3 =
+        if isSplit
+          then plate
+          else difference Winding plate2 r1
+  return $ difference Winding plate3 sh
 
 mkGradient :: Fractional n => Double -> Colour Double -> n -> Texture n
 mkGradient o c w =
