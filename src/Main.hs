@@ -352,8 +352,14 @@ topPlate = do
       then lg'
       else addLogo (Just (35, 40, sn)) lg'
 
-spacerPlate :: KBD (Path V2 Double)
-spacerPlate = do
+cableGuide :: Double -> Path V2 Double
+cableGuide a =
+  let c = a / 2
+      d = -a / 2
+   in mconcat (rect 3 (a + 2) : map (\x -> rect 5 1 # translateY x) [d,d + 2 .. c])
+
+spacerPlate :: Double -> Path V2 Double -> KBD (Path V2 Double)
+spacerPlate c cg = do
   k <- ask
   o <- outline
   sp <- screwPos
@@ -380,15 +386,11 @@ spacerPlate = do
       tp = fromJust (maxTraceP (mkP2 0 0) unitY o)
   plate <- intersection Winding o <$> (mappend fr <$> mirrorP disks)
   let r = rect 20 8 # reversePath # roundPath (-2) # alignT # moveTo tp
-      r1 =
-        mconcat
-          (rect 3 40 : map (\a -> rect 5 1 # translateY a) [-20,-18 .. 20]) #
-        moveTo tp
       plate2 = Winding `union` (plate <> r)
       plate3 =
         if isSplit
           then plate
-          else difference Winding plate2 r1
+          else difference Winding plate2 (cg # moveTo tp # translateY c)
   return $ difference Winding plate3 sh
 
 mkGradient :: Fractional n => Double -> Colour Double -> n -> Texture n
@@ -416,7 +418,13 @@ screws = do
 render :: KBDCfg -> IO ()
 render k = do
   let parts =
-        (`runReader` k) <$> [bottomPlate, spacerPlate, switchPlate, topPlate]
+        (`runReader` k) <$>
+        [ bottomPlate
+        , spacerPlate 0 (cableGuide 15)
+        , spacerPlate (-15) (cableGuide 15)
+        , switchPlate
+        , topPlate
+        ]
       dpi = 96
       sf = dpi / 25.4
       lineW = sf * 0.1
@@ -426,7 +434,7 @@ render k = do
           w = width $ head parts
       aStyles =
         fillTexture gradient :
-        fmap (\c -> fcA (c `withOpacity` 0.5)) (cycle [yellow, black, blue])
+        fmap (\c -> fcA (c `withOpacity` 0.5)) (cycle [yellow, yellow, black, blue])
       diagram = reverse $ zipWith (\s p -> strokePath p # s) aStyles parts
       project = frame 1.05 (vsep 5 diagram) # lwO lineW
       assembly = frame 1.05 $ mconcat (scrs : kc : diagram) # lwO lineW
@@ -555,4 +563,3 @@ main = do
         ]
   gallery ks
   P.mapM_ render ks
-
