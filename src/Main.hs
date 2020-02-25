@@ -337,7 +337,9 @@ topPlate = do
   bp <- bottomPlate
   isSplit <- asks _split
   sn <- serialNumber
-  let innerR = rect (sh + rs / 4 + 1) (sh + cs / 4 + 1)
+  let lg' =
+        over (_Just . _3) ?? lg $ (\p -> vsep 5 [p, sn # scaleUToX (width p)])
+      innerR = rect (sh + rs / 4 + 1) (sh + cs / 4 + 1)
       inner = placeRotated a ashp innerR
       addLogo l p
         | isNothing l || isSplit = p
@@ -346,11 +348,7 @@ topPlate = do
            in (l' # scaleUToX w # translate (pure d * unitY)) <>
               (p # reversePath)
       mask = roundPath (-1) . union Winding $ inner
-  lg' <- addLogo lg <$> (difference Winding bp <$> mirrorP mask)
-  return $
-    if isNothing lg || isSplit
-      then lg'
-      else addLogo (Just (35, 40, sn)) lg'
+  addLogo lg' <$> (difference Winding bp <$> mirrorP mask)
 
 cableGuide :: Double -> Path V2 Double
 cableGuide a =
