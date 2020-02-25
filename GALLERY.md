@@ -1,19 +1,5 @@
 # Gallery
 
-## atreus12
-
-Rendered in Blender
-
-![atreus123d](images/atreus12_a.png)
-
-[atreus12 STL file](images/atreus12_a.stl)
-
-SVG files for CNC cutting
-
-![atreus12a](images/atreus12_a.svg)
-
-![atreus12](images/atreus12.svg)
-
 ## atreus32
 
 Rendered in Blender
