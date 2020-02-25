@@ -30,7 +30,7 @@ def create(fp):
     objs = get_objects(['MESH','CURVE'])
 
     mm = 0.001
-    heights = [3.0 * mm, 6.0 * mm, 1.5 * mm, 3.0 * mm]
+    heights = [3.0 * mm, 3.0 * mm, 3.0 * mm, 1.5 * mm, 3.0 * mm]
     gap = 0.05 * mm
 
     for obj in objs[len(heights):]:

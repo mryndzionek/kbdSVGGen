@@ -529,7 +529,6 @@ main = do
         atreus42 & nThumb .~ 0 & logo .~ Nothing & angle .~ (0 @@ deg) &
         staggering .~
         repeat 0
-      atreus12 = smallBase & nRows .~ 1 & nCols .~ 6 & sep .~ 25
       atreus32 = smallBase & nRows .~ 4 & nCols .~ 4
       atreus44 = atreus42 & nThumb .~ 2
       atreus50 = atreus42 & nCols .~ 6 & topNotch .~ True
@@ -546,8 +545,7 @@ main = do
       atreus208 = atreus206 & nThumb .~ 4
       atreus210 = atreus208 & nThumb .~ 5 & (logo ?~ (80, 90, l))
       ks =
-        [ atreus12
-        , atreus32
+        [ atreus32
         , atreus42
         , atreus44
         , atreus50
