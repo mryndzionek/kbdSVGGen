@@ -203,7 +203,7 @@ screwPos = do
   tn <- asks _topNotch
   isSplit <- asks _split
   ps <- outlinePos
-  let d = (sw / 2) - 2
+  let d = max 1 ((sw / 2) - 2)
       (br, tr, tl, bl) = (head ps, ps !! 1, ps !! 2, ps !! 4)
   return
     [ bl + (0, d)
@@ -449,8 +449,6 @@ render k = do
       callProcess
         fp
         [ "--background"
-        , "-e"
-        , "CYCLES"
         , "--factory-startup"
         , "--python"
         , "svgto3dpng.py"

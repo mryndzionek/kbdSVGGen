@@ -5,6 +5,8 @@ import os.path
 
 import mathutils
 
+mm = 0.001
+
 def get_objects(l):
     return list(filter(lambda x: x.type in l, bpy.context.scene.objects))
 
@@ -29,7 +31,6 @@ def create(fp):
 
     objs = get_objects(['MESH','CURVE'])
 
-    mm = 0.001
     heights = [3.0 * mm, 3.0 * mm, 3.0 * mm, 1.5 * mm, 3.0 * mm]
     gap = 0.05 * mm
 
@@ -81,16 +82,38 @@ def adjust_materials():
 		elif obj.name == 'Curve.001':
 			obj.active_material.blend_method = 'BLEND'
 			obj.active_material.use_nodes = True
-			obj.active_material.node_tree.nodes["Principled BSDF"].inputs[18].default_value = 0.8
+			obj.active_material.node_tree.nodes["Principled BSDF"].inputs[18].default_value = 0.7
 
     
 def adjust_view():
     # move camera closer
     camera = bpy.data.objects['Camera']
-    looking_direction = camera.location - mathutils.Vector((0.0, 0.0, 0.0))
+    camera.location = (0.3, -0.4, 0.3)
+    looking_direction = camera.location - mathutils.Vector((0.0, 0.1, 0.0))
     rot_quat = looking_direction.to_track_quat('Z', 'Y')
     camera.rotation_euler = rot_quat.to_euler()
     camera.location = rot_quat @ mathutils.Vector((0.0, 0.0, 0.5))
+
+def postprocess():
+    # create backgroung plane
+    mat = bpy.data.materials.new("BKG")
+    mat.diffuse_color = (0.0, 0.0, 0.0, 1.0)
+    mat.roughness = 0.7
+    bpy.ops.mesh.primitive_plane_add(location=(0,0,0))
+    o = bpy.context.selected_objects[0] 
+    o.active_material = mat
+
+    light_data = bpy.data.lights.new(name="light_", type='POINT')
+    light_data.energy = 5
+    light_data.use_shadow = True
+    light_data.use_contact_shadow = True
+    light_object = bpy.data.objects.new(name="light_", object_data=light_data)
+    bpy.context.collection.objects.link(light_object)
+    bpy.context.view_layer.objects.active = light_object
+    light_object.location = (0, 0, 100 * mm)
+
+    bpy.context.scene.world.light_settings.use_ambient_occlusion = True
+    bpy.context.scene.world.light_settings.ao_factor = 0.5
     
 def render(rp):
     # render scene
@@ -125,7 +148,9 @@ create(fp)
 move()
 adjust_materials()
 adjust_view()
-render(rp)
 export(rp)
+postprocess()
+render(rp)
+
 
 
