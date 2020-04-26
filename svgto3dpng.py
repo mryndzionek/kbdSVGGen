@@ -122,11 +122,11 @@ def render(rp):
     render.use_file_extension = True
     render.filepath = rp
     bpy.ops.render.render(write_still=True)
+    bpy.ops.wm.save_as_mainfile(filepath='blender/' + os.path.basename(rp) + '.blend')
     
 def export(rp):
     # create STL file
     bpy.ops.export_mesh.stl(filepath=rp + '.stl')
-    bpy.ops.wm.save_as_mainfile(filepath='blender/' + os.path.basename(rp) + '.blend')
 
 argv = sys.argv
 if "--" not in argv:
