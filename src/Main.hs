@@ -9,9 +9,9 @@ import           Control.Monad.Reader
 
 import           System.Process
 
-import           Data.Function    (on)
-import           Data.List        (minimumBy)
+import           Data.List        (minimumBy, maximumBy)
 import           Data.Maybe       (fromJust, isNothing)
+import           Data.Ord         (comparing)
 import           Data.Time.Clock
 import           Data.Time.Format
 import           Data.UUID        (UUID, toString)
@@ -156,20 +156,18 @@ switchHoleNotched s =
       rect (s + 2 * notchDepth) notchWidth #
       translate (V2 0 (-notchOffset))
 
-boundaryPos :: KBD (P2 Double, P2 Double, P2 Double, P2 Double)
-boundaryPos = do
-  k <- ask
+boundaryPos ::
+     ((Double, Double) -> V2 Double)
+  -> KBD (P2 Double, P2 Double, P2 Double, P2 Double)
+boundaryPos f = do
   ashp <- allSwitchHolesPos
-  let srt f g =
-        p2 $
-        minimumBy
-          (g `on` (\p -> maximum $ f <$> [rotP (_angle k) p, r2 p]))
-          ashp
+  let rt = fmap f ashp
+      get = p2 . unr2
   return
-    ( srt (^. _x) compare
-    , srt (^. _x) $ flip compare
-    , srt (^. _y) compare
-    , srt (^. _y) $ flip compare)
+    ( get $ minimumBy (comparing (^. _x) <> comparing (^. _y)) rt
+    , get $ maximumBy (comparing (^. _x) <> comparing (^. _y)) rt
+    , get $ minimumBy (comparing (^. _y) <> comparing (^. _x)) rt
+    , get $ maximumBy (comparing (^. _y) <> comparing (^. _x)) rt)
 
 allSwitchHolesPos :: KBD [(Double, Double)]
 allSwitchHolesPos = do
@@ -231,18 +229,18 @@ screwHoles = do
 outlinePos :: KBD [(Double, Double)]
 outlinePos = do
   k <- ask
-  (minx, maxx, miny, maxy) <- boundaryPos
+  (_, _, minyr, maxyr) <- boundaryPos (rotP (_angle k))
+  (minx, maxx, miny, maxy) <- boundaryPos r2
   let dx = _rowSpacing k - 2
       dy = _columnSpacing k / 3 - 1
       w =
-        (maxx ^. _x) - (minx ^. _x) + _sep k / 2 + dx / 2 + _switchHoleSize k /
-        2
+        (maxx ^. _x) - (minx ^. _x) + _sep k / 2 + dx / 2 +
+        _switchHoleSize k / 2
       h = (maxy ^. _y) - (miny ^. _y) + 2 * dy + _switchHoleSize k
       r =
         rect w h # alignBL # translate (r2 (0, -_switchHoleSize k / 2 - dy / 2))
-      rot' = papply (rotation $ _angle k)
-      pt1 = rot' miny - p2 (0, _switchHoleSize k / 2 + dy + 4)
-      pt2 = rot' maxy + p2 (0, _switchHoleSize k / 2 + dy + 3)
+      pt1 = minyr - p2 (0, _switchHoleSize k / 2 + dy + 4)
+      pt2 = maxyr + p2 (0, _switchHoleSize k / 2 + dy + 3)
       r' = r # rotate (_angle k)
       ps = toVertices r'
       vs1 =
