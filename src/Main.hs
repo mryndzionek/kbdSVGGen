@@ -92,7 +92,11 @@ mirror p = do
       else p <> p # reflectX
 
 mirrorP :: Path V2 Double -> KBD (Path V2 Double)
-mirrorP p = union Winding <$> mirror p
+mirrorP p = do
+  isSplit <- asks _split
+  if isSplit
+    then return $ p # reversePath
+    else union Winding <$> mirror p
 
 fromVertices :: (Metric v, Floating n, Ord n) => [Point v n] -> Path v n
 fromVertices ps =
@@ -234,11 +238,11 @@ outlinePos = do
   let dx = _rowSpacing k - 2
       dy = _columnSpacing k / 3 - 1
       w =
-        (maxx ^. _x) - (minx ^. _x) + _sep k / 2 + dx / 2 +
+        (maxx ^. _x) - (minx ^. _x) + dx / 2 +
         _switchHoleSize k / 2
       h = (maxy ^. _y) - (miny ^. _y) + 2 * dy + _switchHoleSize k
       r =
-        rect w h # alignBL # translate (r2 (0, -_switchHoleSize k / 2 - dy / 2))
+        rect w h # alignBL # translate (r2 (_sep k / 2, -_switchHoleSize k / 2 - dy / 2))
       pt1 = minyr - p2 (0, _switchHoleSize k / 2 + dy + 4)
       pt2 = maxyr + p2 (0, _switchHoleSize k / 2 + dy + 3)
       r' = r # rotate (_angle k)
@@ -337,15 +341,14 @@ topPlate = do
   sn <- serialNumber
   let lg' =
         over (_Just . _3) ?? lg $ (\p -> vsep 5 [p, sn # scaleUToX (width p)])
-      innerR = rect (sh + rs / 4 + 1) (sh + cs / 4 + 1)
-      inner = placeRotated a ashp innerR
+      innerR = roundPath 1 $ rect (sh + rs / 4 + 1) (sh + cs / 4 + 1)
+      mask = placeRotated a ashp innerR
       addLogo l p
         | isNothing l || isSplit = p
         | otherwise =
           let (w, d, l') = fromJust l
            in (l' # scaleUToX w # translate (pure d * unitY)) <>
               (p # reversePath)
-      mask = roundPath (-1) . union Winding $ inner
   addLogo lg' <$> (difference Winding bp <$> mirrorP mask)
 
 cableGuide :: Double -> Path V2 Double
@@ -366,8 +369,7 @@ spacerPlate c cg = do
       (c1, c2) = (cntr punch ^. _y, cntr o ^. _y)
         where
           cntr p = fromJust (mCenterPoint p)
-      disks =
-        union Winding $ placeRotated (0 @@ deg) sp (circle (_washerSize k / 3))
+      disks = placeRotated (0 @@ deg) sp (circle (_washerSize k / 3))
   let fr =
         difference
           Winding
@@ -381,8 +383,10 @@ spacerPlate c cg = do
                 (c2 - c1)))
       tp = fromJust (maxTraceP (mkP2 0 0) unitY o)
   plate <- intersection Winding o <$> (mappend fr <$> mirrorP disks)
-  let r = rect 20 8 # reversePath # roundPath (-2) # alignT # moveTo tp
-      plate2 = Winding `union` (plate <> r)
+  let r = rect 20 8 # reversePath # roundPath (-2)
+      plate2 =
+        Winding `union`
+        (plate <> (r # moveTo tp # translateY (-height r + (w / 4))))
       plate3 =
         if isSplit
           then plate
@@ -496,7 +500,7 @@ main = do
   now <- getCurrentTime
   let ds = formatTime defaultTimeLocale "%Y/%m/%d %H:%M:%S.%3q" now
   u <- fromJust <$> nextUUID
-  let ang = 10 @@ deg
+  let ang = 18.5 @@ deg
       atreus42 =
         KBDCfg
           { _nRows = 4
@@ -512,7 +516,7 @@ main = do
           , _screwSize = 3
           , _washerSize = 13
           , _screwHole = roundHole
-          , _sep = 40
+          , _sep = 60
           , _hooks = False
           , _split = False
           , _topNotch = False
@@ -522,22 +526,22 @@ main = do
           , _uuid = u
           }
       smallBase =
-        atreus42 & nThumb .~ 0 & logo .~ Nothing & angle .~ (0 @@ deg) &
-        staggering .~
-        repeat 0
+        atreus42 & nThumb .~ 0 & logo .~ Nothing & angle .~ (0.001 @@ deg) &
+        staggering .~ repeat 0 &
+        sep .~ 30
       atreus32 = smallBase & nRows .~ 4 & nCols .~ 4
       atreus44 = atreus42 & nThumb .~ 2
       atreus50 = atreus42 & nCols .~ 6 & topNotch .~ True
       atreus52h = atreus50 & nThumb .~ 2 & hooks .~ True
       atreus52s =
-        atreus52h & split .~ True & hooks .~ False & angle .~ (0 @@ deg)
-      atreus62 = atreus50 & nRows .~ 5
+        atreus52h & split .~ True & hooks .~ False & angle .~ (0 @@ deg) &
+        sep .~ 45
+      atreus62 = atreus50 & nRows .~ 5 & sep .~ 55
       atreus62s = atreus62 & split .~ True
       atreus206 =
-        atreus42 & nCols .~ 10 & nRows .~ 10 & nThumb .~ 3 &
+        atreus42 & nCols .~ 10 & nRows .~ 10 & nThumb .~ 3 & sep .~ 80 &
         (logo ?~ (60, 80, l)) &
-        topNotch .~
-        True
+        topNotch .~ True
       atreus208 = atreus206 & nThumb .~ 4
       atreus210 = atreus208 & nThumb .~ 5 & (logo ?~ (80, 90, l))
       ks =
