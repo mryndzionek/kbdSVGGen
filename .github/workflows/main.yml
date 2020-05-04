@@ -13,10 +13,10 @@ jobs:
     steps:
 
     - name: Setup Stack
-      uses: mstksg/setup-stack@v1
+      uses: mstksg/setup-stack@69e4283faeb7a89f26326daa36e9cc0fa7a023bd
     
     - name: Checkout
-      uses: actions/checkout@v2-beta
+      uses: actions/checkout@01aecccf739ca6ff86c0539fbc67a7a5007bbc81
       
     - name: Build
       run: |
@@ -24,7 +24,7 @@ jobs:
         stack build && time stack exec kbdSVGGen
         set +ex
 
-    - uses: actions/upload-artifact@v1.0.0
+    - uses: actions/upload-artifact@e7eefc491732c06d0ebbf4d4f49dcc25b4d2f3a8
       with:
         name: images
         path: images
