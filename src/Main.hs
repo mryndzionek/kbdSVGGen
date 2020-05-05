@@ -10,7 +10,7 @@ import           Control.Monad.Reader
 import           System.Process
 
 import           Data.List        (minimumBy, maximumBy)
-import           Data.Maybe       (fromJust, isNothing)
+import           Data.Maybe       (fromJust, isJust, isNothing)
 import           Data.Ord         (comparing)
 import           Data.Time.Clock
 import           Data.Time.Format
@@ -52,7 +52,7 @@ data KBDCfg = KBDCfg
   , _sep            :: Double
   , _hooks          :: Bool
   , _split          :: Bool
-  , _topNotch       :: Bool
+  , _topNotch       :: Maybe Double
   , _logo           :: Maybe (Double, Double, Path V2 Double)
   , _textFont       :: PreparedFont Double
   , _date           :: String
@@ -212,8 +212,8 @@ screwPos = do
     , br + (-d, d)
     , tr + (-d, -d)
     , tl +
-      (if tn && not isSplit
-         then (15, -16)
+      (if isJust tn && not isSplit
+         then (15, -(fromJust tn + 6))
          else (sp / 2, -d))
     ]
 
@@ -266,10 +266,10 @@ outline = do
   vs2 <- outlinePos
   let s = adjP (p2 <$> vs2)
       t =
-        if isSplit || not tn
+        if isSplit || isNothing tn
           then s
-          else let r = 75
-                   dpt = 12 :: Double
+          else let r = 7 * fromJust tn
+                   dpt = fromJust tn :: Double
                    tp =
                      fromJust (maxTraceP (mkP2 0 0) unitY s) #
                      translate (-unitY * pure dpt)
@@ -519,7 +519,7 @@ main = do
           , _sep = 60
           , _hooks = False
           , _split = False
-          , _topNotch = False
+          , _topNotch = Nothing
           , _logo = Just (35, 45, l)
           , _textFont = f
           , _date = ds
@@ -531,7 +531,7 @@ main = do
         sep .~ 30
       atreus32 = smallBase & nRows .~ 4 & nCols .~ 4
       atreus44 = atreus42 & nThumb .~ 2
-      atreus50 = atreus42 & nCols .~ 6 & topNotch .~ True
+      atreus50 = atreus42 & nCols .~ 6 & (topNotch ?~ 15)
       atreus52h = atreus50 & nThumb .~ 2 & hooks .~ True
       atreus52s =
         atreus52h & split .~ True & hooks .~ False & angle .~ (0 @@ deg) &
@@ -541,7 +541,7 @@ main = do
       atreus206 =
         atreus42 & nCols .~ 10 & nRows .~ 10 & nThumb .~ 3 & sep .~ 80 &
         (logo ?~ (60, 80, l)) &
-        topNotch .~ True
+        (topNotch ?~ 15)
       atreus208 = atreus206 & nThumb .~ 4
       atreus210 = atreus208 & nThumb .~ 5 & (logo ?~ (80, 90, l))
       ks =
