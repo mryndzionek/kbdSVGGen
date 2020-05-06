@@ -533,6 +533,7 @@ main = do
       atreus44 = atreus42 & nThumb .~ 2
       atreus50 = atreus42 & nCols .~ 6 & (topNotch ?~ 15)
       atreus52h = atreus50 & nThumb .~ 2 & hooks .~ True
+      atreus54 = atreus50 & nThumb .~ 3 & sep .~ 40
       atreus52s =
         atreus52h & split .~ True & hooks .~ False & angle .~ (0 @@ deg) &
         sep .~ 45
@@ -550,6 +551,7 @@ main = do
         , atreus44
         , atreus50
         , atreus52h
+        , atreus54
         , atreus52s
         , atreus62
         , atreus62s

@@ -70,6 +70,20 @@ SVG files for CNC cutting
 
 ![atreus52h](images/atreus52h.svg)
 
+## atreus54
+
+Rendered in Blender
+
+![atreus543d](images/atreus54_a.png)
+
+[atreus54 STL file](images/atreus54_a.stl)
+
+SVG files for CNC cutting
+
+![atreus54a](images/atreus54_a.svg)
+
+![atreus54](images/atreus54.svg)
+
 ## atreus52s
 
 Rendered in Blender
