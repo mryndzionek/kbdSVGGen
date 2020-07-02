@@ -76,13 +76,20 @@ def move():
 
 def adjust_materials():
 	objs = get_objects(['CURVE'])
-	for obj in objs:
+	for i, obj in enumerate(objs):
 		if obj.active_material == None:
-			obj.active_material = bpy.data.materials.new(name="SVGMat")
-		elif obj.name == 'Curve.001':
+			obj.active_material = bpy.data.materials.new(name="SVGMat" + str(i))
+		elif i in [1, 2]:
+			c = obj.active_material.diffuse_color
+			obj.active_material = bpy.data.materials.new(name="SVGMat" + str(i))
+			obj.active_material.diffuse_color = c
 			obj.active_material.blend_method = 'BLEND'
 			obj.active_material.use_nodes = True
-			obj.active_material.node_tree.nodes["Principled BSDF"].inputs[18].default_value = 0.7
+			obj.active_material.node_tree.nodes["Principled BSDF"].inputs[18].default_value = 0.5
+		else:
+			c = obj.active_material.diffuse_color
+			obj.active_material = bpy.data.materials.new(name="SVGMat" + str(i))
+			obj.active_material.diffuse_color = c
 
     
 def adjust_view():
@@ -122,11 +129,11 @@ def render(rp):
     render.use_file_extension = True
     render.filepath = rp
     bpy.ops.render.render(write_still=True)
-    bpy.ops.wm.save_as_mainfile(filepath='blender/' + os.path.basename(rp) + '.blend')
     
 def export(rp):
     # create STL file
     bpy.ops.export_mesh.stl(filepath=rp + '.stl')
+    bpy.ops.wm.save_as_mainfile(filepath='blender/' + os.path.basename(rp) + '.blend')
 
 argv = sys.argv
 if "--" not in argv:
