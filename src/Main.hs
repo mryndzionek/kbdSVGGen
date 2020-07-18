@@ -310,12 +310,21 @@ addHooks p = do
 switchPlate :: KBD (Path V2 Double)
 switchPlate = do
   let hole = asks _switchHole <*> asks _switchHoleSize
+  lg <- asks _logo
+  isSplit <- asks _split
   hasHooks <- asks _hooks
-  difference Winding <$>
-    (if hasHooks
-       then bottomPlate >>= addHooks
-       else bottomPlate) <*>
-    (hole >>= switchHoles >>= mirrorP)
+  let plate =
+        difference Winding <$>
+        (if hasHooks
+           then bottomPlate >>= addHooks
+           else bottomPlate) <*>
+        (hole >>= switchHoles >>= mirrorP)
+  if isNothing lg || isSplit
+    then plate
+    else difference Winding <$> plate <*>
+         return
+           (circle (fromJust lg ^. _1 / 2) #
+            translate (pure (fromJust lg ^. _2) * unitY))
 
 serialNumber :: KBD (Path V2 Double)
 serialNumber = do
@@ -497,7 +506,7 @@ logo_ =
   union Winding $
   difference
     Winding
-    (pentagram 21 9 <> difference Winding (circle 18) (circle 17))
+    (pentagram 21 9 <> difference Winding (circle 19.5) (circle 18.25))
     c2
   where
     c1 =
