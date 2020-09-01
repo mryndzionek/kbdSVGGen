@@ -128,7 +128,7 @@ tpos n = do
     ( fst (lut !! n) * _rowSpacing k + (_sep k / 2)
     , (if _nThumb k > 1 && odd (_nThumb k) && (n == 0)
          then 0
-         else _columnSpacing k / 2) -
+         else _columnSpacing k / 3) -
       snd (lut !! n) *
       _columnSpacing k)
 
@@ -268,7 +268,7 @@ outline = do
       t =
         if isSplit || isNothing tn
           then s
-          else let r = 7 * fromJust tn
+          else let r = 8 * fromJust tn
                    dpt = fromJust tn :: Double
                    tp =
                      fromJust (maxTraceP (mkP2 0 0) unitY s) #
@@ -338,9 +338,8 @@ topPlate = do
   ashp <- allSwitchHolesPos
   bp <- bottomPlate
   isSplit <- asks _split
-  sn <- serialNumber
   let lg' =
-        over (_Just . _3) ?? lg $ (\p -> vsep 5 [p, sn # scaleUToX (width p)])
+        over (_Just . _3) ?? lg $ (\p -> vsep 5 [p])
       innerR = roundPath 1 $ rect (sh + rs / 4 + 1) (sh + cs / 4 + 1)
       mask = placeRotated a ashp innerR
       addLogo l p
@@ -390,7 +389,7 @@ spacerPlate c cg = do
       plate3 =
         if isSplit
           then plate
-          else difference Winding plate2 (cg # moveTo tp # translateY c)
+          else plate2
   return $ difference Winding plate3 sh
 
 mkGradient :: Fractional n => Double -> Colour Double -> n -> Texture n
@@ -445,7 +444,7 @@ render k = do
         renderSVG n sp d
   generate ("images/" ++ show k ++ ".svg") project
   generate ("images/" ++ show k ++ "_a.svg") assembly
-  blp <- findExecutable "blender"
+  blp <- findExecutable "_blender"
   case blp of
     Just fp ->
       callProcess
@@ -532,6 +531,7 @@ main = do
       atreus32 = smallBase & nRows .~ 4 & nCols .~ 4
       atreus44 = atreus42 & nThumb .~ 2
       atreus50 = atreus42 & nCols .~ 6 & (topNotch ?~ 15)
+      atreus52 = atreus50 & nThumb .~ 2
       atreus52h = atreus50 & nThumb .~ 2 & hooks .~ True
       atreus54 = atreus50 & nThumb .~ 3 & sep .~ 40
       atreus52s =
@@ -550,6 +550,7 @@ main = do
         , atreus42
         , atreus44
         , atreus50
+        , atreus52
         , atreus52h
         , atreus54
         , atreus52s
