@@ -9,8 +9,8 @@ import           Control.Monad.Reader
 
 import           System.Process
 
-import           Data.List        (minimumBy, maximumBy)
-import           Data.Maybe       (fromJust, isJust, isNothing)
+import           Data.List        (minimumBy)
+import           Data.Maybe       (fromJust, isNothing)
 import           Data.Ord         (comparing)
 import           Data.Time.Clock
 import           Data.Time.Format
@@ -19,10 +19,10 @@ import           Data.UUID.V1     (nextUUID)
 
 import           Diagrams.Backend.SVG
 import           Diagrams.Path
-import           Diagrams.Prelude           hiding (difference, fromVertices,
-                                             intersection, parts, plate,
-                                             project, render, sep, trace, union,
-                                             _sep)
+import           Diagrams.Prelude           hiding (connect, difference,
+                                             fromVertices, intersection, parts,
+                                             plate, project, render, sep, trace,
+                                             union, _sep)
 
 import           Diagrams.TwoD.Offset
 import           Diagrams.TwoD.Path.Boolean
@@ -31,7 +31,7 @@ import qualified Graphics.Svg               as S
 import           Graphics.SVGFonts
 import           Graphics.SVGFonts.ReadFont (PreparedFont)
 
-import           System.Directory  (findExecutable)
+import           System.Directory           (findExecutable)
 
 type KBD = Reader KBDCfg
 
@@ -160,19 +160,6 @@ switchHoleNotched s =
       rect (s + 2 * notchDepth) notchWidth #
       translate (V2 0 (-notchOffset))
 
-boundaryPos ::
-     ((Double, Double) -> V2 Double)
-  -> KBD (P2 Double, P2 Double, P2 Double, P2 Double)
-boundaryPos f = do
-  ashp <- allSwitchHolesPos
-  let rt = fmap f ashp
-      get = p2 . unr2
-  return
-    ( get $ minimumBy (comparing (^. _x) <> comparing (^. _y)) rt
-    , get $ maximumBy (comparing (^. _x) <> comparing (^. _y)) rt
-    , get $ minimumBy (comparing (^. _y) <> comparing (^. _x)) rt
-    , get $ maximumBy (comparing (^. _y) <> comparing (^. _x)) rt)
-
 allSwitchHolesPos :: KBD [(Double, Double)]
 allSwitchHolesPos = do
   (nc, nr, nt) <- traverseOf each asks (_nCols, _nRows, _nThumb)
@@ -200,22 +187,30 @@ hexagonalHole d =
 
 screwPos :: KBD [(Double, Double)]
 screwPos = do
-  sp <- asks _sep
-  sw <- asks _spacerWidth
-  tn <- asks _topNotch
+  hs <- asks _switchHoleSize
+  a <- asks _angle
   isSplit <- asks _split
-  ps <- outlinePos
-  let d = max 1 ((sw / 2) - 2)
-      (br, tr, tl, bl) = (head ps, ps !! 1, ps !! 2, ps !! 4)
-  return
-    [ bl + (0, d)
-    , br + (-d, d)
-    , tr + (-d, -d)
-    , tl +
-      (if isJust tn && not isSplit
-         then (15, -(fromJust tn + 6))
-         else (sp / 2, -d))
-    ]
+  (nc, nr, nt) <- traverseOf each asks (_nCols, _nRows, _nThumb)
+  tp <- (:) <$> kpos 0 0 <*> mapM tpos [0 .. nt - 1]
+  let mtp = p2 $ minimumBy (comparing snd <> comparing fst) tp
+  ps <-
+    mapM (fmap p2 . uncurry kpos) [(nc - 1, 0), (0, nr - 1), (nc - 1, nr - 1)]
+  let o = ((hs * sqrt 2) / 2) + 3
+      offs =
+        fmap
+          p2
+          [ (if a < 10 @@ deg
+               then (0, -hs)
+               else (-o, -o))
+          , (o, -o)
+          , (0, hs)
+          , (o, o)
+          ]
+      ps' = unp2 . rotate a <$> zipWith (+) (mtp : ps) offs
+  return $
+    if isSplit
+      then ps'
+      else ps' & ix 2 . _1 .~ (15 / 2)
 
 placeRotated ::
      (Transformable b, Monoid b, N b ~ Double, V b ~ V2)
@@ -230,55 +225,23 @@ screwHoles = do
   let hole = asks _screwHole <*> asks _screwSize
   (placeRotated (0 @@ deg) <$> screwPos <*> hole) >>= mirrorP
 
-outlinePos :: KBD [(Double, Double)]
-outlinePos = do
-  k <- ask
-  (_, _, minyr, maxyr) <- boundaryPos (rotP (_angle k))
-  (minx, maxx, miny, maxy) <- boundaryPos r2
-  let dx = _rowSpacing k - 2
-      dy = _columnSpacing k / 3 - 1
-      w =
-        (maxx ^. _x) - (minx ^. _x) + dx / 2 +
-        _switchHoleSize k / 2
-      h = (maxy ^. _y) - (miny ^. _y) + 2 * dy + _switchHoleSize k
-      r =
-        rect w h # alignBL # translate (r2 (_sep k / 2, -_switchHoleSize k / 2 - dy / 2))
-      pt1 = minyr - p2 (0, _switchHoleSize k / 2 + dy + 4)
-      pt2 = maxyr + p2 (0, _switchHoleSize k / 2 + dy + 3)
-      r' = r # rotate (_angle k)
-      ps = toVertices r'
-      vs1 =
-        [ head ps
-        , p2 (head ps ^. _x, pt2 ^. _y)
-        , p2 (0, pt2 ^. _y)
-        , p2 (0, pt1 ^. _y)
-        , pt1
-        ]
-      mask1 = adjP vs1
-      np = fromJust $ maxTraceP (head ps) (unitY # rotate (_angle k)) mask1
-  return $ fmap unp2 [head ps, np, p2 (0, pt2 ^. _y), p2 (0, pt1 ^. _y), pt1]
+connect :: Path V2 Double -> KBD (Path V2 Double)
+connect p = do
+  isSplit <- asks _split
+  a <- asks _angle
+  k <- rotate a . p2 <$> kpos 0 0
+  let u = fromJust $ maxTraceP k (rotate a unitY) p
+      d = fromJust $ maxTraceP k (rotate a (-unitY)) p
+      c = adjP [p2 (0, u ^. _y), u, d, p2 (0, d ^. _y)]
+  return $
+    if isSplit
+      then p
+      else mconcat [p, c]
 
 outline :: KBD (Path V2 Double)
 outline = do
-  ws <- asks _washerSize
-  isSplit <- asks _split
-  tn <- asks _topNotch
-  vs2 <- outlinePos
-  let s = adjP (p2 <$> vs2)
-      t =
-        if isSplit || isNothing tn
-          then s
-          else let r = 8 * fromJust tn
-                   dpt = fromJust tn :: Double
-                   tp =
-                     fromJust (maxTraceP (mkP2 0 0) unitY s) #
-                     translate (-unitY * pure dpt)
-                   notch =
-                     circle r # reversePath #
-                     translate (unitY * pure (r - dpt / 2)) #
-                     moveTo tp
-                in difference Winding s notch
-  roundPath (-ws / 3) <$> (t # mirrorP)
+  o <- roundPath (-7) <$> switchesCutout
+  connect o >>= mirrorP
 
 bottomPlate :: KBD (Path V2 Double)
 bottomPlate = do
@@ -329,19 +292,23 @@ serialNumber = do
         textSVG' (TextOpts f INSIDE_H KERN False 1 1) t' # reversePath # alignL
   return $ alignT $ center $ vsep 0.4 (map txt2svg (s : t ++ [s]))
 
-topPlate :: KBD (Path V2 Double)
-topPlate = do
+switchesCutout :: KBD (Path V2 Double)
+switchesCutout = do
   (sh, rs, cs) <-
     traverseOf each asks (_switchHoleSize, _rowSpacing, _columnSpacing)
   a <- asks _angle
-  lg <- asks _logo
   ashp <- allSwitchHolesPos
+  let innerR = roundPath 1 $ rect (sh + rs / 4 + 1) (sh + cs / 4 + 1)
+      mask = placeRotated a ashp innerR
+  return $ union Winding mask
+
+topPlate :: KBD (Path V2 Double)
+topPlate = do
+  lg <- asks _logo
   bp <- bottomPlate
   isSplit <- asks _split
-  let lg' =
-        over (_Just . _3) ?? lg $ (\p -> vsep 5 [p])
-      innerR = roundPath 1 $ rect (sh + rs / 4 + 1) (sh + cs / 4 + 1)
-      mask = placeRotated a ashp innerR
+  mask <- switchesCutout
+  let lg' = over (_Just . _3) ?? lg $ (\p -> vsep 5 [p])
       addLogo l p
         | isNothing l || isSplit = p
         | otherwise =
@@ -356,41 +323,16 @@ cableGuide a =
       d = -a / 2
    in mconcat (rect 3 (a + 2) : map (\x -> rect 5 1 # translateY x) [d,d + 2 .. c])
 
-spacerPlate :: Double -> Path V2 Double -> KBD (Path V2 Double)
-spacerPlate c cg = do
-  k <- ask
+spacerPlate :: KBD (Path V2 Double)
+spacerPlate = do
   o <- outline
   sp <- screwPos
-  sh <- screwHoles
-  isSplit <- asks _split
-  let w = 2.5 * _spacerWidth k
-      punch = o # scaleToX (width o - w) # scaleToY (height o - w) # reversePath
-      (c1, c2) = (cntr punch ^. _y, cntr o ^. _y)
-        where
-          cntr p = fromJust (mCenterPoint p)
-      disks = placeRotated (0 @@ deg) sp (circle (_washerSize k / 3))
-  let fr =
-        difference
-          Winding
-          o
-          (punch #
-           translate
-             (V2
-                (if _split k
-                   then w / 2
-                   else 0)
-                (c2 - c1)))
-      tp = fromJust (maxTraceP (mkP2 0 0) unitY o)
-  plate <- intersection Winding o <$> (mappend fr <$> mirrorP disks)
-  let r = rect 20 8 # reversePath # roundPath (-2)
-      plate2 =
-        Winding `union`
-        (plate <> (r # moveTo tp # translateY (-height r + (w / 4))))
-      plate3 =
-        if isSplit
-          then plate
-          else plate2
-  return $ difference Winding plate3 sh
+  ws <- asks _washerSize
+  p1' <- roundPath (-1) <$> switchesCutout
+  disks <- mirrorP $ placeRotated (0 @@ deg) sp (circle (ws / 3))
+  p2' <- difference Winding o <$> (connect p1' >>= mirrorP)
+  let p3' = intersection Winding o (p2' <> disks)
+  difference Winding p3' <$> screwHoles
 
 mkGradient :: Fractional n => Double -> Colour Double -> n -> Texture n
 mkGradient o c w =
@@ -419,8 +361,7 @@ render k = do
   let parts =
         (`runReader` k) <$>
         [ bottomPlate
-        , spacerPlate 0 (cableGuide 15)
-        , spacerPlate (-15) (cableGuide 15)
+        , spacerPlate
         , switchPlate
         , topPlate
         ]
@@ -428,12 +369,7 @@ render k = do
       sf = dpi / 25.4
       lineW = sf * 0.1
       (kc, scrs) = over each (`runReader` k) (keycaps, screws)
-      gradient = mkGradient 1 gray (w / 4)
-        where
-          w = width $ head parts
-      aStyles =
-        fillTexture gradient :
-        fmap (\c -> fcA (c `withOpacity` 0.5)) (cycle [yellow, yellow, black, blue])
+      aStyles = fmap (\c -> fcA (c `withOpacity` 0.5)) (cycle [black, yellow, black, blue])
       diagram = reverse $ zipWith (\s p -> strokePath p # s) aStyles parts
       project = frame 1.05 (vsep 5 diagram) # lwO lineW
       assembly = frame 1.05 $ mconcat (scrs : kc : diagram) # lwO lineW
@@ -444,7 +380,7 @@ render k = do
         renderSVG n sp d
   generate ("images/" ++ show k ++ ".svg") project
   generate ("images/" ++ show k ++ "_a.svg") assembly
-  blp <- findExecutable "_blender"
+  blp <- findExecutable "blender"
   case blp of
     Just fp ->
       callProcess
@@ -532,11 +468,9 @@ main = do
       atreus44 = atreus42 & nThumb .~ 2
       atreus50 = atreus42 & nCols .~ 6 & (topNotch ?~ 15)
       atreus52 = atreus50 & nThumb .~ 2
-      atreus52h = atreus50 & nThumb .~ 2 & hooks .~ True
-      atreus54 = atreus50 & nThumb .~ 3 & sep .~ 40
       atreus52s =
-        atreus52h & split .~ True & hooks .~ False & angle .~ (0 @@ deg) &
-        sep .~ 45
+        atreus52 & split .~ True & angle .~ (0.001 @@ deg) & sep .~ 45
+      atreus54 = atreus50 & nThumb .~ 3 & sep .~ 40
       atreus62 = atreus50 & nRows .~ 5 & sep .~ 55
       atreus62s = atreus62 & split .~ True
       atreus206 =
@@ -551,9 +485,8 @@ main = do
         , atreus44
         , atreus50
         , atreus52
-        , atreus52h
-        , atreus54
         , atreus52s
+        , atreus54
         , atreus62
         , atreus62s
         , atreus206
