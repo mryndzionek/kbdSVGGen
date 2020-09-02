@@ -56,33 +56,19 @@ SVG files for CNC cutting
 
 ![atreus50](images/atreus50.svg)
 
-## atreus52h
+## atreus52
 
 Rendered in Blender
 
-![atreus52h3d](images/atreus52h_a.png)
+![atreus523d](images/atreus52_a.png)
 
-[atreus52h STL file](images/atreus52h_a.stl)
-
-SVG files for CNC cutting
-
-![atreus52ha](images/atreus52h_a.svg)
-
-![atreus52h](images/atreus52h.svg)
-
-## atreus54
-
-Rendered in Blender
-
-![atreus543d](images/atreus54_a.png)
-
-[atreus54 STL file](images/atreus54_a.stl)
+[atreus52 STL file](images/atreus52_a.stl)
 
 SVG files for CNC cutting
 
-![atreus54a](images/atreus54_a.svg)
+![atreus52a](images/atreus52_a.svg)
 
-![atreus54](images/atreus54.svg)
+![atreus52](images/atreus52.svg)
 
 ## atreus52s
 
@@ -97,6 +83,20 @@ SVG files for CNC cutting
 ![atreus52sa](images/atreus52s_a.svg)
 
 ![atreus52s](images/atreus52s.svg)
+
+## atreus54
+
+Rendered in Blender
+
+![atreus543d](images/atreus54_a.png)
+
+[atreus54 STL file](images/atreus54_a.stl)
+
+SVG files for CNC cutting
+
+![atreus54a](images/atreus54_a.svg)
+
+![atreus54](images/atreus54.svg)
 
 ## atreus62
 
