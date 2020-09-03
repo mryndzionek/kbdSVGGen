@@ -10,7 +10,7 @@ import           Control.Monad.Reader
 import           System.Process
 
 import           Data.List        (minimumBy)
-import           Data.Maybe       (fromJust, isNothing)
+import           Data.Maybe       (fromJust, fromMaybe, isNothing)
 import           Data.Ord         (comparing)
 import           Data.Time.Clock
 import           Data.Time.Format
@@ -38,7 +38,8 @@ type KBD = Reader KBDCfg
 data KBDCfg = KBDCfg
   { _nRows          :: Int
   , _nCols          :: Int
-  , _nThumb         :: Int
+  , _thumb          :: Either [(Int, Int)] Int
+  , _lowerOffset    :: Maybe Double
   , _columnSpacing  :: Double
   , _rowSpacing     :: Double
   , _switchHoleSize :: Double
@@ -62,13 +63,19 @@ data KBDCfg = KBDCfg
 instance Show KBDCfg where
   show k =
     "atreus" ++
-    show (2 * (_nRows k * _nCols k + _nThumb k)) ++
+    show (2 * (_nRows k * _nCols k + nt)) ++
     (if _split k
        then "s"
        else "") ++
     (if _hooks k
        then "h"
-       else "")
+       else "") ++
+    ts
+    where
+      (nt, ts) =
+        case _thumb k of
+          Right a -> (a, "")
+          Left a  -> (length a, "ct")
 
 makeLenses ''KBDCfg
 makeLensesFor [("_elements", "sElements")] ''S.Document
@@ -112,32 +119,33 @@ adjP ps =
   let a = fromVertices ps # alignBL
    in a # translate (r2 . unp2 $ (head ps - head (toVertices a)))
 
-tpos :: Int -> KBD (Double, Double)
-tpos n = do
+tpos :: KBD [(Double, Double)]
+tpos = do
   k <- ask
-  let lut =
-        [ ( fromIntegral $
-            (if odd (_nThumb k)
-               then i + 1
-               else i) `quot`
-            2
-          , fromIntegral $ i `rem` 2)
-        | i <- [0 .. _nThumb k - 1]
-        ]
-  return
-    ( fst (lut !! n) * _rowSpacing k + (_sep k / 2)
-    , (if _nThumb k > 1 && odd (_nThumb k) && (n == 0)
-         then 0
-         else _columnSpacing k / 3) -
-      snd (lut !! n) *
-      _columnSpacing k)
+  (sx, sy) <- kpos 0 0
+  let ts =
+        case _thumb k of
+          Right a -> [(i `quot` 2, i `rem` 2) | i <- [0 .. a - 1]]
+          Left a  -> a
+      i2pos (i, j) =
+        ( sx - (fromIntegral i + 1) * _rowSpacing k
+        , sy - fromIntegral j * _columnSpacing k +
+          if i >= 0
+            then _columnSpacing k / 3
+            else 0)
+  return $
+    fmap i2pos ts &
+    if odd (length ts) && length ts > 1 && fst (last ts) >= 0
+      then (ix (length ts - 1) . _2) %~ (\x -> x - _columnSpacing k / 3)
+      else id
 
 kpos :: Int -> Int -> KBD (Double, Double)
 kpos m n = do
   k <- ask
   st <- staggering'
-  let nt = fromIntegral $ (_nThumb k + 1) `quot` 2
-  let x = nt * _rowSpacing k + (_sep k / 2)
+  nt <- length <$> tpos
+  let ntq = fromIntegral $ (nt + 1) `quot` 2
+  let x = ntq * _rowSpacing k + (_sep k / 2)
   return
     ( x + fromIntegral m * _rowSpacing k
     , (st !! fromIntegral m) + (fromIntegral n * _columnSpacing k))
@@ -162,12 +170,12 @@ switchHoleNotched s =
 
 allSwitchHolesPos :: KBD [(Double, Double)]
 allSwitchHolesPos = do
-  (nc, nr, nt) <- traverseOf each asks (_nCols, _nRows, _nThumb)
-  shp [0 .. nc - 1] [0 .. nr - 1] [0 .. nt - 1]
+  (nc, nr) <- traverseOf each asks (_nCols, _nRows)
+  shp [0 .. nc - 1] [0 .. nr - 1]
   where
-    shp xr yr tr = do
+    shp xr yr = do
       keys <- sequence [kpos x y | x <- xr, y <- yr]
-      tkeys <- sequence [tpos i | i <- tr]
+      tkeys <- tpos
       return $ keys ++ tkeys
 
 switchHoles :: (Transformable b, Monoid b, N b ~ Double, V b ~ V2) => b -> KBD b
@@ -190,8 +198,8 @@ screwPos = do
   hs <- asks _switchHoleSize
   a <- asks _angle
   isSplit <- asks _split
-  (nc, nr, nt) <- traverseOf each asks (_nCols, _nRows, _nThumb)
-  tp <- (:) <$> kpos 0 0 <*> mapM tpos [0 .. nt - 1]
+  (nc, nr) <- traverseOf each asks (_nCols, _nRows)
+  tp <- (:) <$> kpos 0 0 <*> tpos
   let mtp = p2 $ minimumBy (comparing snd <> comparing fst) tp
   ps <-
     mapM (fmap p2 . uncurry kpos) [(nc - 1, 0), (0, nr - 1), (nc - 1, nr - 1)]
@@ -199,9 +207,9 @@ screwPos = do
       offs =
         fmap
           p2
-          [ (if a < 10 @@ deg
-               then (0, -hs)
-               else (-o, -o))
+          [ if a < 10 @@ deg
+              then (0, -hs)
+              else (-o, -o)
           , (o, -o)
           , (0, hs)
           , (o, o)
@@ -230,8 +238,9 @@ connect p = do
   isSplit <- asks _split
   a <- asks _angle
   k <- rotate a . p2 <$> kpos 0 0
+  lo <- fromMaybe 0 <$> asks _lowerOffset
   let u = fromJust $ maxTraceP k (rotate a unitY) p
-      d = fromJust $ maxTraceP k (rotate a (-unitY)) p
+      d = fromJust (maxTraceP k (rotate a (-unitY)) p) & _y %~ (+lo)
       c = adjP [p2 (0, u ^. _y), u, d, p2 (0, d ^. _y)]
   return $
     if isSplit
@@ -440,7 +449,8 @@ main = do
         KBDCfg
           { _nRows = 4
           , _nCols = 5
-          , _nThumb = 1
+          , _thumb = Right 1
+          , _lowerOffset = Nothing
           , _columnSpacing = 19
           , _rowSpacing = 19
           , _switchHoleSize = 13.97
@@ -451,34 +461,35 @@ main = do
           , _screwSize = 3
           , _washerSize = 13
           , _screwHole = roundHole
-          , _sep = 60
+          , _sep = 50
           , _hooks = False
           , _split = False
           , _topNotch = Nothing
-          , _logo = Just (35, 45, l)
+          , _logo = Just (35, 35, l)
           , _textFont = f
           , _date = ds
           , _uuid = u
           }
       smallBase =
-        atreus42 & nThumb .~ 0 & logo .~ Nothing & angle .~ (0.001 @@ deg) &
+        atreus42 & thumb .~ Right 0 & logo .~ Nothing & angle .~ (0.001 @@ deg) &
         staggering .~ repeat 0 &
         sep .~ 30
       atreus32 = smallBase & nRows .~ 4 & nCols .~ 4
-      atreus44 = atreus42 & nThumb .~ 2
+      atreus44 = atreus42 & thumb .~ Right 2
       atreus50 = atreus42 & nCols .~ 6 & (topNotch ?~ 15)
-      atreus52 = atreus50 & nThumb .~ 2
+      atreus52 = atreus50 & thumb .~ Right 2
+      atreus52ct = atreus50 & thumb .~ Left [(0, 0), (-1, 1)] & lowerOffset .~ Just 20
       atreus52s =
         atreus52 & split .~ True & angle .~ (0.001 @@ deg) & sep .~ 45
-      atreus54 = atreus50 & nThumb .~ 3 & sep .~ 40
+      atreus54 = atreus50 & thumb .~ Right 3 & sep .~ 40
       atreus62 = atreus50 & nRows .~ 5 & sep .~ 55
       atreus62s = atreus62 & split .~ True
       atreus206 =
-        atreus42 & nCols .~ 10 & nRows .~ 10 & nThumb .~ 3 & sep .~ 80 &
+        atreus42 & nCols .~ 10 & nRows .~ 10 & thumb .~ Right 3 & sep .~ 80 &
         (logo ?~ (60, 80, l)) &
         (topNotch ?~ 15)
-      atreus208 = atreus206 & nThumb .~ 4
-      atreus210 = atreus208 & nThumb .~ 5 & (logo ?~ (80, 90, l))
+      atreus208 = atreus206 & thumb .~ Right 4
+      atreus210 = atreus208 & thumb .~ Right 5 & (logo ?~ (80, 90, l))
       ks =
         [ atreus32
         , atreus42
@@ -486,6 +497,7 @@ main = do
         , atreus50
         , atreus52
         , atreus52s
+        , atreus52ct
         , atreus54
         , atreus62
         , atreus62s
