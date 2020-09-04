@@ -4,18 +4,17 @@
 module Main where
 
 import           Control.Lens               hiding ((#), parts, plate)
-import qualified Control.Monad.Parallel     as P
 import           Control.Monad.Reader
 
 import           System.Process
 
-import           Data.List        (minimumBy)
-import           Data.Maybe       (fromJust, fromMaybe, isNothing)
-import           Data.Ord         (comparing)
+import           Data.List                  (minimumBy)
+import           Data.Maybe                 (fromJust, fromMaybe, isNothing)
+import           Data.Ord                   (comparing)
 import           Data.Time.Clock
 import           Data.Time.Format
-import           Data.UUID        (UUID, toString)
-import           Data.UUID.V1     (nextUUID)
+import           Data.UUID                  (UUID, toString)
+import           Data.UUID.V1               (nextUUID)
 
 import           Diagrams.Backend.SVG
 import           Diagrams.Path
@@ -51,7 +50,6 @@ data KBDCfg = KBDCfg
   , _washerSize     :: Double
   , _screwHole      :: Double -> Path V2 Double
   , _sep            :: Double
-  , _hooks          :: Bool
   , _split          :: Bool
   , _topNotch       :: Maybe Double
   , _logo           :: Maybe (Double, Double, Path V2 Double)
@@ -66,9 +64,6 @@ instance Show KBDCfg where
     show (2 * (_nRows k * _nCols k + nt)) ++
     (if _split k
        then "s"
-       else "") ++
-    (if _hooks k
-       then "h"
        else "") ++
     ts
     where
@@ -257,37 +252,10 @@ bottomPlate = do
   o <- outline
   difference Winding o <$> screwHoles
 
-addHooks :: Path V2 Double -> KBD (Path V2 Double)
-addHooks p = do
-  sp <- screwPos
-  isSplit <- asks _split
-  let (w, h, d) = (16, 3, 1.5)
-      a = negated (signedAngleBetween unitX (r2 (sp !! 1) - r2 (head sp)))
-      an =
-        if isSplit
-          then (-45 @@ deg)
-          else (-20 @@ deg)
-      hp =
-        fromJust $ maxTraceP (fromJust (mCenterPoint p)) (unitX # rotate an) p
-      hook =
-        difference
-          Winding
-          (rect (w + d) 9)
-          (rect w h # translate (-unitY * 2.5)) #
-        roundPath (-0.5) #
-        rotate a #
-        moveTo hp
-  mappend p <$> mirrorP hook
-
 switchPlate :: KBD (Path V2 Double)
 switchPlate = do
   let hole = asks _switchHole <*> asks _switchHoleSize
-  hasHooks <- asks _hooks
-  difference Winding <$>
-    (if hasHooks
-       then bottomPlate >>= addHooks
-       else bottomPlate) <*>
-    (hole >>= switchHoles >>= mirrorP)
+  difference Winding <$> bottomPlate <*> (hole >>= switchHoles >>= mirrorP)
 
 serialNumber :: KBD (Path V2 Double)
 serialNumber = do
@@ -445,6 +413,7 @@ main = do
   let ds = formatTime defaultTimeLocale "%Y/%m/%d %H:%M:%S.%3q" now
   u <- fromJust <$> nextUUID
   let ang = 18.5 @@ deg
+      zeroAng = 0.001 @@ deg
       atreus42 =
         KBDCfg
           { _nRows = 4
@@ -462,7 +431,6 @@ main = do
           , _washerSize = 13
           , _screwHole = roundHole
           , _sep = 50
-          , _hooks = False
           , _split = False
           , _topNotch = Nothing
           , _logo = Just (35, 35, l)
@@ -471,19 +439,22 @@ main = do
           , _uuid = u
           }
       smallBase =
-        atreus42 & thumb .~ Right 0 & logo .~ Nothing & angle .~ (0.001 @@ deg) &
+        atreus42 & thumb .~ Right 0 & logo .~ Nothing & angle .~ zeroAng &
         staggering .~ repeat 0 &
-        sep .~ 30
+        sep .~ 38
+      atreus8 = smallBase & nRows .~ 1 & nCols .~ 4
+      atreus10 = atreus8 & thumb .~ Right 1 & angle .~ ang
       atreus32 = smallBase & nRows .~ 4 & nCols .~ 4
       atreus44 = atreus42 & thumb .~ Right 2
       atreus50 = atreus42 & nCols .~ 6 & (topNotch ?~ 15)
       atreus52 = atreus50 & thumb .~ Right 2
-      atreus52ct = atreus50 & thumb .~ Left [(0, 0), (-1, 1)] & lowerOffset .~ Just 20
-      atreus52s =
-        atreus52 & split .~ True & angle .~ (0.001 @@ deg) & sep .~ 45
+      atreus52ct =
+        atreus50 & thumb .~ Left [(0, 0), (-1, 1)] & lowerOffset .~ Just 12
+      atreus52s = atreus52 & split .~ True & angle .~ zeroAng & sep .~ 45
       atreus54 = atreus50 & thumb .~ Right 3 & sep .~ 40
       atreus62 = atreus50 & nRows .~ 5 & sep .~ 55
       atreus62s = atreus62 & split .~ True
+      atreus72 = atreus50 & nRows .~ 5 & nCols .~ 7 & sep .~ 60
       atreus206 =
         atreus42 & nCols .~ 10 & nRows .~ 10 & thumb .~ Right 3 & sep .~ 80 &
         (logo ?~ (60, 80, l)) &
@@ -491,7 +462,9 @@ main = do
       atreus208 = atreus206 & thumb .~ Right 4
       atreus210 = atreus208 & thumb .~ Right 5 & (logo ?~ (80, 90, l))
       ks =
-        [ atreus32
+        [ atreus8
+        , atreus10
+        , atreus32
         , atreus42
         , atreus44
         , atreus50
@@ -501,9 +474,10 @@ main = do
         , atreus54
         , atreus62
         , atreus62s
+        , atreus72
         , atreus206
         , atreus208
         , atreus210
         ]
   gallery ks
-  P.mapM_ render ks
+  mapM_ render ks

@@ -1,5 +1,33 @@
 # Gallery
 
+## atreus8
+
+Rendered in Blender
+
+![atreus83d](images/atreus8_a.png)
+
+[atreus8 STL file](images/atreus8_a.stl)
+
+SVG files for CNC cutting
+
+![atreus8a](images/atreus8_a.svg)
+
+![atreus8](images/atreus8.svg)
+
+## atreus10
+
+Rendered in Blender
+
+![atreus103d](images/atreus10_a.png)
+
+[atreus10 STL file](images/atreus10_a.stl)
+
+SVG files for CNC cutting
+
+![atreus10a](images/atreus10_a.svg)
+
+![atreus10](images/atreus10.svg)
+
 ## atreus32
 
 Rendered in Blender
@@ -139,6 +167,20 @@ SVG files for CNC cutting
 ![atreus62sa](images/atreus62s_a.svg)
 
 ![atreus62s](images/atreus62s.svg)
+
+## atreus72
+
+Rendered in Blender
+
+![atreus723d](images/atreus72_a.png)
+
+[atreus72 STL file](images/atreus72_a.stl)
+
+SVG files for CNC cutting
+
+![atreus72a](images/atreus72_a.svg)
+
+![atreus72](images/atreus72.svg)
 
 ## atreus206
 
