@@ -248,9 +248,7 @@ outline = do
   connect o >>= mirrorP
 
 bottomPlate :: KBD (Path V2 Double)
-bottomPlate = do
-  o <- outline
-  difference Winding o <$> screwHoles
+bottomPlate = union Winding <$> outline
 
 switchPlate :: KBD (Path V2 Double)
 switchPlate = do
@@ -282,7 +280,7 @@ switchesCutout = do
 topPlate :: KBD (Path V2 Double)
 topPlate = do
   lg <- asks _logo
-  bp <- bottomPlate
+  bp <- outline
   isSplit <- asks _split
   mask <- switchesCutout
   let lg' = over (_Just . _3) ?? lg $ (\p -> vsep 5 [p])
@@ -290,8 +288,7 @@ topPlate = do
         | isNothing l || isSplit = p
         | otherwise =
           let (w, d, l') = fromJust l
-           in (l' # scaleUToX w # translate (pure d * unitY)) <>
-              (p # reversePath)
+           in p <> (l' # scaleUToX w # translate (pure d * unitY) # reversePath)
   addLogo lg' <$> (difference Winding bp <$> mirrorP mask)
 
 cableGuide :: Double -> Path V2 Double
@@ -308,8 +305,7 @@ spacerPlate = do
   p1' <- roundPath (-1) <$> switchesCutout
   disks <- mirrorP $ placeRotated (0 @@ deg) sp (circle (ws / 3))
   p2' <- difference Winding o <$> (connect p1' >>= mirrorP)
-  let p3' = intersection Winding o (p2' <> disks)
-  difference Winding p3' <$> screwHoles
+  return $ intersection Winding o (p2' <> disks)
 
 mkGradient :: Fractional n => Double -> Colour Double -> n -> Texture n
 mkGradient o c w =
@@ -327,16 +323,11 @@ keycaps = do
   cs <- switchHoles cap'
   mirror cs
 
-screws :: KBD (Diagram B)
-screws = do
-  let hole =
-        pure $ hexagonalHole 5.5 # strokePath # fcA (black `withOpacity` 0.5)
-  (placeRotated (0 @@ deg) <$> screwPos <*> hole) >>= mirror
-
 render :: KBDCfg -> IO ()
 render k = do
-  let parts =
-        (`runReader` k) <$>
+  let drillHoles p = (<>) <$> p <*> (reversePath <$> screwHoles)
+      parts =
+        (`runReader` k) <$> fmap drillHoles
         [ bottomPlate
         , spacerPlate
         , switchPlate
@@ -345,11 +336,11 @@ render k = do
       dpi = 96
       sf = dpi / 25.4
       lineW = sf * 0.1
-      (kc, scrs) = over each (`runReader` k) (keycaps, screws)
+      kc = (`runReader` k) keycaps
       aStyles = fmap (\c -> fcA (c `withOpacity` 0.5)) (cycle [black, yellow, black, blue])
       diagram = reverse $ zipWith (\s p -> strokePath p # s) aStyles parts
       project = frame 1.05 (vsep 5 diagram) # lwO lineW
-      assembly = frame 1.05 $ mconcat (scrs : kc : diagram) # lwO lineW
+      assembly = frame 1.05 $ mconcat (kc : diagram) # lwO lineW
       sizeSp d = dims2D (sf * width d) (sf * height d)
       generate n d = do
         let sp = sizeSp d
@@ -449,7 +440,7 @@ main = do
       atreus50 = atreus42 & nCols .~ 6 & (topNotch ?~ 15)
       atreus52 = atreus50 & thumb .~ Right 2
       atreus52ct =
-        atreus50 & thumb .~ Left [(0, 0), (-1, 1)] & lowerOffset .~ Just 12
+        atreus50 & thumb .~ Left [(0, 0), (-1, 1)] & lowerOffset ?~ 12
       atreus52s = atreus52 & split .~ True & angle .~ zeroAng & sep .~ 45
       atreus54 = atreus50 & thumb .~ Right 3 & sep .~ 40
       atreus62 = atreus50 & nRows .~ 5 & sep .~ 55
