@@ -9,6 +9,7 @@ import           Control.Monad.Reader
 import           System.Process
 
 import           Data.List                  (minimumBy)
+import           Data.List.Index            (insertAt)
 import           Data.Maybe                 (fromJust, fromMaybe, isNothing)
 import           Data.Ord                   (comparing)
 import           Data.Time.Clock
@@ -297,15 +298,19 @@ cableGuide a =
       d = -a / 2
    in mconcat (rect 3 (a + 2) : map (\x -> rect 5 1 # translateY x) [d,d + 2 .. c])
 
-spacerPlate :: KBD (Path V2 Double)
-spacerPlate = do
-  o <- outline
+spacerPunch :: KBD (Path V2 Double)
+spacerPunch = do
   sp <- screwPos
   ws <- asks _washerSize
   p1' <- roundPath (-1) <$> switchesCutout
+  p2' <- connect p1' >>= mirrorP
   disks <- mirrorP $ placeRotated (0 @@ deg) sp (circle (ws / 3))
-  p2' <- difference Winding o <$> (connect p1' >>= mirrorP)
-  return $ intersection Winding o (p2' <> disks)
+  return $ difference Winding p2' disks
+
+spacerPlate :: KBD (Path V2 Double)
+spacerPlate = do
+  o <- outline
+  difference Winding o <$> spacerPunch
 
 mkGradient :: Fractional n => Double -> Colour Double -> n -> Texture n
 mkGradient o c w =
@@ -327,17 +332,17 @@ render :: KBDCfg -> IO ()
 render k = do
   let drillHoles p = (<>) <$> p <*> (reversePath <$> screwHoles)
       parts =
-        (`runReader` k) <$> fmap drillHoles
+        (`runReader` k) <$> insertAt 1 spacerPunch (fmap drillHoles
         [ bottomPlate
         , spacerPlate
         , switchPlate
         , topPlate
-        ]
+        ])
       dpi = 96
       sf = dpi / 25.4
       lineW = sf * 0.1
       kc = (`runReader` k) keycaps
-      aStyles = fmap (\c -> fcA (c `withOpacity` 0.5)) (cycle [black, yellow, black, blue])
+      aStyles = fmap (\c -> fcA (c `withOpacity` 0.5)) (cycle [gray, gray, yellow, black, blue])
       diagram = reverse $ zipWith (\s p -> strokePath p # s) aStyles parts
       project = frame 1.05 (vsep 5 diagram) # lwO lineW
       assembly = frame 1.05 $ mconcat (kc : diagram) # lwO lineW

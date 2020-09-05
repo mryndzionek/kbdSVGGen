@@ -31,7 +31,7 @@ def create(fp):
 
     objs = get_objects(['MESH','CURVE'])
 
-    heights = [1.5 * mm, 6.0 * mm, 1.5 * mm, 3.0 * mm]
+    heights = [1.5 * mm, 1.0 * mm, 8.0 * mm, 1.5 * mm, 3.0 * mm]
     gap = 0.05 * mm
 
     for obj in objs[len(heights):]:
@@ -39,7 +39,7 @@ def create(fp):
         bpy.ops.object.delete()
 
     a = 0
-    for h, obj in zip(heights, objs):
+    for i, (h, obj) in enumerate(zip(heights, objs)):
         bpy.context.view_layer.objects.active = None
         bpy.context.view_layer.objects.active = obj
         
@@ -51,7 +51,8 @@ def create(fp):
         bpy.ops.object.mode_set(mode='OBJECT')
 
         bpy.ops.transform.translate(value = (0, 0, a + (h / 2)), constraint_axis = (True, True, True))
-        a += h + gap
+        if i != 1:
+            a += h + gap
         
         obj.select_set(False)
         
@@ -79,7 +80,7 @@ def adjust_materials():
 	for obj in objs:
 		if obj.active_material == None:
 			obj.active_material = bpy.data.materials.new(name="SVGMat")
-		elif obj.name == 'Curve.001':
+		elif obj.name == 'Curve.002':
 			obj.active_material.blend_method = 'BLEND'
 			obj.active_material.use_nodes = True
 			obj.active_material.node_tree.nodes["Principled BSDF"].inputs[18].default_value = 0.7
