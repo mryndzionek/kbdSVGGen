@@ -13,7 +13,7 @@ def get_objects(l):
 def prepare():
 	bpy.ops.object.select_all(action='DESELECT')
 
-	objs = get_objects(['MESH','CURVE'])
+	objs = get_objects(['MESH', 'CURVE', 'LIGHT'])
 
 	# delete all the existing meshes and curves
 	for obj in objs:
@@ -115,11 +115,13 @@ def adjust_materials():
 			tn.inputs['Base Color'].default_value = c
 			tn.inputs['Roughness'].default_value = 0.2
 			tn.inputs['Metallic'].default_value = 0.7
+			if obj.name == 'Curve.001':
+				tn.inputs[17].default_value = (0.06, 0.06, 0.06, 1)
 
 def adjust_view():
 	# move camera closer
 	camera = bpy.data.objects['Camera']
-	camera.location = (0.3, -0.4, 0.3)
+	camera.location = (0.35, -0.3, 0.32)
 	looking_direction = camera.location - mathutils.Vector((0.0, 0.1, 0.0))
 	rot_quat = looking_direction.to_track_quat('Z', 'Y')
 	camera.rotation_euler = rot_quat.to_euler()
