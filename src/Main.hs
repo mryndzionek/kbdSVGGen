@@ -342,7 +342,7 @@ render k = do
       sf = dpi / 25.4
       lineW = sf * 0.1
       kc = (`runReader` k) keycaps
-      aStyles = fmap (\c -> fcA (c `withOpacity` 0.5)) (cycle [gray, gray, yellow, black, blue])
+      aStyles = fmap (\c -> fcA (c `withOpacity` 0.5)) (cycle [black, gray, yellow, black, blue])
       diagram = reverse $ zipWith (\s p -> strokePath p # s) aStyles parts
       project = frame 1.05 (vsep 5 diagram) # lwO lineW
       assembly = frame 1.05 $ mconcat (kc : diagram) # lwO lineW
@@ -360,6 +360,8 @@ render k = do
         fp
         [ "--background"
         , "--factory-startup"
+        , "-E"
+        , "CYCLES"
         , "--python"
         , "svgto3dpng.py"
         , "--"
