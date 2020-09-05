@@ -3,7 +3,7 @@ name: CI
 on:
   push:
     branches:    
-      - sec_kbd
+      - master
 
 jobs:
   build:

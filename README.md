@@ -1,4 +1,4 @@
-# [Atreus](https://github.com/technomancy/atreus) keyboard design files implemented in [diagrams](http://hackage.haskell.org/package/diagrams)
+# [Atreus-like](https://github.com/technomancy/atreus) keyboard design files implemented in [diagrams](http://hackage.haskell.org/package/diagrams)
 
 ## :warning: This is highly experimental project
 ## :warning: The generated files were not (yet) used to build an actual keyboard !
@@ -38,8 +38,3 @@ Compiling and running
 stack build && stack exec kbdSVGGen
 ```
 
-TODO
-----
-  - [ ] places for connectors
-  - [x] 'split' option
-  - [ ] simple web UI interface
