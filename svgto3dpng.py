@@ -76,11 +76,9 @@ def move():
 	bpy.ops.transform.translate(value=(-kbd.location.x, -kbd.location.y, 0))
 
 
-def change_to_glass(obj):
+def change_to_glass(obj, color):
 	TreeNodes = obj.active_material.node_tree
 	links = TreeNodes.links
-
-	matc = obj.active_material.node_tree.nodes["Principled BSDF"].inputs['Base Color'].default_value
 
 	# Remove nodes (clean it)
 	for node in TreeNodes.nodes:
@@ -95,7 +93,7 @@ def change_to_glass(obj):
 	node_glass.location = 0, 180
 	node_glass.distribution = 'GGX'
 	# Preserve color
-	node_glass.inputs['Color'].default_value = matc
+	node_glass.inputs['Color'].default_value = color
 	node_glass.inputs['Roughness'].default_value = 0.3
 	node_glass.inputs['IOR'].default_value = 1.2
 
@@ -105,15 +103,16 @@ def change_to_glass(obj):
 def adjust_materials():
 	objs = get_objects(['CURVE'])
 	for obj in objs:
+		c = obj.active_material.diffuse_color
+		obj.active_material.use_nodes = True
 		if obj.active_material == None:
 			obj.active_material = bpy.data.materials.new(name="SVGMat")
 		elif obj.name == 'Curve.002':
 			obj.active_material.blend_method = 'BLEND'
-			obj.active_material.use_nodes = True
-			change_to_glass(obj)
+			change_to_glass(obj, c)
 		else:
-			obj.active_material.use_nodes = True
 			tn = obj.active_material.node_tree.nodes["Principled BSDF"]
+			tn.inputs['Base Color'].default_value = c
 			tn.inputs['Roughness'].default_value = 0.2
 			tn.inputs['Metallic'].default_value = 0.7
 
@@ -135,23 +134,41 @@ def postprocess():
 
 	tn = o.active_material.node_tree.nodes["Principled BSDF"]
 	tn.inputs['Base Color'].default_value = (0.0420277, 0.0420277, 0.0420277, 1)
-	tn.inputs['Roughness'].default_value = 0.8
+	tn.inputs['Roughness'].default_value = 0.35
 	tn.inputs['Specular'].default_value = 0.2
-	tn.inputs['Metallic'].default_value = 0.6
+	tn.inputs['Metallic'].default_value = 0.75
 
-	light_data = bpy.data.lights.new(name="light_", type='POINT')
+	light_data = bpy.data.lights.new(name="light1", type='POINT')
 	light_data.energy = 5
 	light_data.use_shadow = True
 	light_data.use_contact_shadow = True
-	light_object = bpy.data.objects.new(name="light_", object_data=light_data)
+	light_object = bpy.data.objects.new(name="light1", object_data=light_data)
 	bpy.context.collection.objects.link(light_object)
 	bpy.context.view_layer.objects.active = light_object
-	light_object.location = (0, 0, 100 * mm)
+	light_object.location = (100 * mm, 90 * mm, 100 * mm)
+
+	light_data = bpy.data.lights.new(name="light2", type='POINT')
+	light_data.use_shadow = True
+	light_data.use_contact_shadow = True
+	light_data.energy = 2.5
+	light_object = bpy.data.objects.new(name="light2", object_data=light_data)
+	bpy.context.collection.objects.link(light_object)
+	bpy.context.view_layer.objects.active = light_object
+	light_object.location = (-200 * mm, 90 * mm, 100 * mm)
+
+	light_data = bpy.data.lights.new(name="light3", type='POINT')
+	light_data.use_shadow = True
+	light_data.use_contact_shadow = True
+	light_data.energy = 2.5
+	light_object = bpy.data.objects.new(name="light3", object_data=light_data)
+	bpy.context.collection.objects.link(light_object)
+	bpy.context.view_layer.objects.active = light_object
+	light_object.location = (0 * mm, 90 * mm, 100 * mm)
 		
 def render(rp):
-	bpy.context.scene.view_layers['View Layer'].cycles.use_denoising = True
 	# render scene
 	scene = bpy.context.scene
+	scene.cycles.use_denoising = True
 	render = scene.render
 	render.use_file_extension = True
 	render.filepath = rp
