@@ -4,7 +4,7 @@
 ## :warning: The generated files were not (yet) used to build an actual keyboard !
 ## :warning: Do not trust the generated files !
 
-![status](https://github.com/mryndzionek/kbdSVGGen/workflows/CI/badge.svg)
+![CI](https://github.com/mryndzionek/kbdSVGGen/workflows/CI/badge.svg?branch=devel)
 
 This is another attempt at generating mechanical keyboard design files programmatically.
 Previous one is [here](https://github.com/mryndzionek/h-atreus).
