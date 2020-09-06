@@ -16,6 +16,10 @@ Scale is also adjusted (96 DPI), so apps like Inkscape show correct dimensions.
 Inkscape can also be used to convert the files to other formats like DXF.
 
 Generated Blender files tarballs can be found in releases.
+Blender files can be tweaked manually:
+
+![atreus52ct_wood](images/atreus52ct_wood.png)
+
 Full gallery [here](GALLERY.md).
 
 <p align="center">
