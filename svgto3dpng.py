@@ -108,6 +108,9 @@ def render(rp):
 	bpy.ops.wm.save_as_mainfile(filepath='blender/' + os.path.basename(rp) + '.blend')
 	
 def export(rp):
+	bpy.ops.object.select_all(action='DESELECT')
+	bpy.data.objects['Plane'].select_set(True)
+	bpy.ops.object.delete()
 	# create STL file
 	bpy.ops.export_mesh.stl(filepath=rp + '.stl')
 
@@ -131,5 +134,5 @@ create(fp)
 move()
 load_template()
 adjust_materials()
-export(rp)
 render(rp)
+export(rp)
