@@ -280,23 +280,22 @@ switchesCutout = do
 
 topPlate :: KBD (Path V2 Double)
 topPlate = do
+  sp <- screwPos
+  ws <- asks _washerSize
   lg <- asks _logo
   bp <- outline
   isSplit <- asks _split
-  mask <- switchesCutout
-  let lg' = over (_Just . _3) ?? lg $ (\p -> vsep 5 [p])
+  mask <- switchesCutout >>= mirrorP
+  disks <- mirrorP $ placeRotated (0 @@ deg) sp (circle (ws / 3))
+  let mask2 = difference Winding mask disks
+      plate = difference Winding bp mask2
+      lg' = over (_Just . _3) ?? lg $ (\p -> vsep 5 [p])
       addLogo l p
         | isNothing l || isSplit = p
         | otherwise =
           let (w, d, l') = fromJust l
            in p <> (l' # scaleUToX w # translate (pure d * unitY) # reversePath)
-  addLogo lg' <$> (difference Winding bp <$> mirrorP mask)
-
-cableGuide :: Double -> Path V2 Double
-cableGuide a =
-  let c = a / 2
-      d = -a / 2
-   in mconcat (rect 3 (a + 2) : map (\x -> rect 5 1 # translateY x) [d,d + 2 .. c])
+  addLogo lg' <$> return plate
 
 spacerPunch :: KBD (Path V2 Double)
 spacerPunch = do
