@@ -336,20 +336,28 @@ render :: KBDCfg -> IO ()
 render k = do
   let drillHoles p = (<>) <$> p <*> (reversePath <$> screwHoles)
       parts =
-        (`runReader` k) <$> insertAt 1 spacerPunch (fmap drillHoles
-        [ bottomPlate
-        , spacerPlate
-        , switchPlate
-        , topPlate
-        ])
+        (`runReader` k) <$>
+        insertAt
+          1
+          spacerPunch
+          (fmap drillHoles [bottomPlate, spacerPlate, switchPlate, topPlate])
       dpi = 96
       sf = dpi / 25.4
       lineW = sf * 0.1
       kc = (`runReader` k) keycaps
-      aStyles = fmap (\c -> fcA (c `withOpacity` 0.5)) (cycle [black, gray, yellow, black, blue])
+      aStyles =
+        fmap
+          (\c -> fcA (c `withOpacity` 0.5))
+          (cycle [black, gray, yellow, black, blue])
       diagram = reverse $ zipWith (\s p -> strokePath p # s) aStyles parts
       project = frame 1.05 (vsep 5 diagram) # lwO lineW
       assembly = frame 1.05 $ mconcat (kc : diagram) # lwO lineW
+      pcb =
+        let sp = spacerPunch `runReader` k
+            (x, y) = head $ allSwitchHolesPos `runReader` k
+            h = rotate (_angle k) $ roundHole 3 # translate (V2 x y)
+            d = strokePath (difference Winding sp h) # head aStyles
+         in frame 1.05 $ d # lwO lineW
       sizeSp d = dims2D (sf * width d) (sf * height d)
       generate n d = do
         let sp = sizeSp d
@@ -357,6 +365,7 @@ render k = do
         renderSVG n sp d
   generate ("gen/" ++ show k ++ ".svg") project
   generate ("gen/" ++ show k ++ "_a.svg") assembly
+  generate ("gen/" ++ show k ++ "_pcb.svg") pcb
   blp <- findExecutable "blender"
   case blp of
     Just fp ->
@@ -373,25 +382,41 @@ render k = do
         ]
     Nothing -> return ()
 
+
 rotatedSwitches :: KBD [(Double, Double)]
 rotatedSwitches = do
   a <- asks _angle
-  fmap (unr2 . rotate a . r2) <$> allSwitchHolesPos
+  fmap (unr2 . rotate a . r2) <$>
+    allSwitchHolesPos
 
 instance ToJSON KBDCfg where
   toJSON cfg@KBDCfg{..} = object [
     "columns" .= _nCols,
     "rows" .= _nRows,
+    "width" .= width bp,
+    "height" .= height bp,
     "split" .= _split, 
     "angle" .= (_angle ^. deg),
     "switches" .= (rotatedSwitches `runReader` cfg)]
+    where 
+      bp = bottomPlate `runReader` cfg
 
-saveCfg :: KBDCfg -> IO ()
-saveCfg cfg = do
-  let fn = "gen/" ++ show cfg ++ ".json"
+genPCB :: KBDCfg -> IO ()
+genPCB cfg = do
+  let cfn = "gen/" ++ show cfg ++ ".json"
+      dxfIn = "gen/" ++ show cfg ++ "_pcb.svg"
+      dxfOut = "gen/" ++ show cfg ++ "_pcb.dxf"
       js = T.decodeUtf8 . encode $ cfg
-  putStrLn $ "Saving JSON config '" ++ fn
-  T.writeFile fn js
+  putStrLn $ "Saving JSON config: " ++ cfn
+  T.writeFile cfn js
+  callProcess
+    "pcb/svg2dxf.sh"
+    [ dxfIn
+    , dxfOut
+    ]
+  putStrLn $ "Generating KiCad PCB: gen/" ++ show cfg ++ ".kicad_pcb"
+  callProcess "python3" ["jsontokicad.py", cfn]
+
 
 svgToPath :: FilePath -> IO (Path V2 Double)
 svgToPath f = do
@@ -503,4 +528,4 @@ main = do
         ]
   gallery ks
   mapM_ render ks
-  mapM_ saveCfg ks
+  mapM_ genPCB ks
