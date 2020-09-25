@@ -18,7 +18,7 @@ Inkscape can also be used to convert the files to other formats like DXF.
 Generated Blender files tarballs can be found in releases.
 Blender files can be tweaked manually:
 
-![atreus52ct_wood](images/atreus52ct_wood.png)
+![atreus52ct_wood](gen/atreus52ct_wood.png)
 
 Full gallery [here](GALLERY.md).
 
@@ -30,9 +30,9 @@ Full gallery [here](GALLERY.md).
   <img src="gifs/blender_2.gif">
 </p>
 
-![atreus423d](images/atreus42_a.png)
-![atreus42a](images/atreus42_a.svg)
-![atreus42](images/atreus42.svg)
+![atreus423d](gen/atreus42_a.png)
+![atreus42a](gen/atreus42_a.svg)
+![atreus42](gen/atreus42.svg)
 
 
 Compiling and running

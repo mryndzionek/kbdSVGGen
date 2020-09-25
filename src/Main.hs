@@ -1,28 +1,32 @@
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE RecordWildCards  #-}
 {-# LANGUAGE TypeFamilies     #-}
 
 module Main where
 
-import           Control.Lens               hiding ((#), parts, plate)
+import           Control.Lens               hiding ((#), (.=), parts, plate)
 import           Control.Monad.Reader
 
 import           System.Process
 
-import           Data.List                  (minimumBy)
-import           Data.List.Index            (insertAt)
-import           Data.Maybe                 (fromJust, fromMaybe, isNothing)
-import           Data.Ord                   (comparing)
+import           Data.Aeson
+import           Data.List               (minimumBy)
+import           Data.List.Index         (insertAt)
+import           Data.Maybe              (fromJust, fromMaybe, isNothing)
+import           Data.Ord                (comparing)
+import qualified Data.Text.Lazy.Encoding as T
+import qualified Data.Text.Lazy.IO       as T
 import           Data.Time.Clock
 import           Data.Time.Format
-import           Data.UUID                  (UUID, toString)
-import           Data.UUID.V1               (nextUUID)
+import           Data.UUID               (UUID, toString)
+import           Data.UUID.V1            (nextUUID)
 
 import           Diagrams.Backend.SVG
 import           Diagrams.Path
 import           Diagrams.Prelude           hiding (connect, difference,
                                              fromVertices, intersection, parts,
                                              plate, project, render, sep, trace,
-                                             union, _sep)
+                                             union, (.=), _sep)
 
 import           Diagrams.TwoD.Offset
 import           Diagrams.TwoD.Path.Boolean
@@ -32,6 +36,7 @@ import           Graphics.SVGFonts
 import           Graphics.SVGFonts.ReadFont (PreparedFont)
 
 import           System.Directory           (findExecutable)
+
 
 type KBD = Reader KBDCfg
 
@@ -350,8 +355,8 @@ render k = do
         let sp = sizeSp d
         putStrLn $ "Generating '" ++ n ++ "', " ++ show sp
         renderSVG n sp d
-  generate ("images/" ++ show k ++ ".svg") project
-  generate ("images/" ++ show k ++ "_a.svg") assembly
+  generate ("gen/" ++ show k ++ ".svg") project
+  generate ("gen/" ++ show k ++ "_a.svg") assembly
   blp <- findExecutable "blender"
   case blp of
     Just fp ->
@@ -364,9 +369,29 @@ render k = do
         , "--python"
         , "svgto3dpng.py"
         , "--"
-        , "images/" ++ show k ++ "_a.svg"
+        , "gen/" ++ show k ++ "_a.svg"
         ]
     Nothing -> return ()
+
+rotatedSwitches :: KBD [(Double, Double)]
+rotatedSwitches = do
+  a <- asks _angle
+  fmap (unr2 . rotate a . r2) <$> allSwitchHolesPos
+
+instance ToJSON KBDCfg where
+  toJSON cfg@KBDCfg{..} = object [
+    "columns" .= _nCols,
+    "rows" .= _nRows,
+    "split" .= _split, 
+    "angle" .= (_angle ^. deg),
+    "switches" .= (rotatedSwitches `runReader` cfg)]
+
+saveCfg :: KBDCfg -> IO ()
+saveCfg cfg = do
+  let fn = "gen/" ++ show cfg ++ ".json"
+      js = T.decodeUtf8 . encode $ cfg
+  putStrLn $ "Saving JSON config '" ++ fn
+  T.writeFile fn js
 
 svgToPath :: FilePath -> IO (Path V2 Double)
 svgToPath f = do
@@ -394,11 +419,11 @@ gallery ks =
          in unlines
               [ "## " ++ entry ++ "\n"
               , "Rendered in Blender\n"
-              , "![" ++ entry ++ "3d](images/" ++ entry ++ "_a.png)\n"
-              , "[" ++ entry ++ " STL file](images/" ++ entry ++ "_a.stl)\n"
+              , "![" ++ entry ++ "3d](gen/" ++ entry ++ "_a.png)\n"
+              , "[" ++ entry ++ " STL file](gen/" ++ entry ++ "_a.stl)\n"
               , "SVG files for CNC cutting\n"
-              , "![" ++ entry ++ "a](images/" ++ entry ++ "_a.svg)\n"
-              , "![" ++ entry ++ "](images/" ++ entry ++ ".svg)\n"
+              , "![" ++ entry ++ "a](gen/" ++ entry ++ "_a.svg)\n"
+              , "![" ++ entry ++ "](gen/" ++ entry ++ ".svg)\n"
               ]
    in writeFile "GALLERY.md" $ "# Gallery\n\n" ++ concatMap gen ks
 
@@ -478,3 +503,4 @@ main = do
         ]
   gallery ks
   mapM_ render ks
+  mapM_ saveCfg ks
