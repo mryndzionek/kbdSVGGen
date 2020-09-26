@@ -21,6 +21,10 @@ jobs:
     - name: Build
       run: |
         set -ex
+        sudo add-apt-repository --yes ppa:kicad/kicad-5.1-releases
+        sudo apt update
+        sudo apt install --install-recommends kicad
+        sudo apt-get install inkscape
         mkdir -p blender
         wget https://download.blender.org/release/Blender2.90/blender-2.90.0-linux64.tar.xz
         tar xvJf blender-2.90.0-linux64.tar.xz
@@ -30,8 +34,8 @@ jobs:
 
     - uses: actions/upload-artifact@e7eefc491732c06d0ebbf4d4f49dcc25b4d2f3a8
       with:
-        name: images
-        path: images
+        name: gen
+        path: gen
 
 
     - uses: actions/upload-artifact@e7eefc491732c06d0ebbf4d4f49dcc25b4d2f3a8
