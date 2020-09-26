@@ -21,6 +21,9 @@ jobs:
     - name: Build
       run: |
         set -ex
+        sudo add-apt-repository --yes ppa:kicad/kicad-5.1-releases
+        sudo apt update
+        sudo apt install --install-recommends kicad
         mkdir -p blender
         wget https://download.blender.org/release/Blender2.90/blender-2.90.0-linux64.tar.xz
         tar xvJf blender-2.90.0-linux64.tar.xz
