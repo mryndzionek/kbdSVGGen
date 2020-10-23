@@ -1,7 +1,6 @@
 # [Atreus-like](https://github.com/technomancy/atreus) keyboard design files implemented in [diagrams](http://hackage.haskell.org/package/diagrams)
 
 ## :warning: This is highly experimental project
-## :warning: The generated files were not (yet) used to build an actual keyboard !
 ## :warning: Do not trust the generated files !
 
 ![CI](https://github.com/mryndzionek/kbdSVGGen/workflows/CI/badge.svg?branch=devel)
@@ -21,6 +20,7 @@ Blender files can be tweaked manually:
 ![atreus52ct_wood](images/atreus52ct_wood.png)
 
 Full gallery [here](GALLERY.md).
+First keyboard built based on generated files [here](https://gist.github.com/mryndzionek/0fb397242e55262d831ccf3e8f38dcb0).
 
 <p align="center">
   <img src="gifs/blender_1.gif">
