@@ -13,8 +13,10 @@ plates = {'bottomPlate': (1.5 * mm, 'steel'),
           'switchPlate': (1.5 * mm, 'steel'),
           'topPlate': (3 * mm, 'wood')}
 
+
 def get_objects(l):
     return list(filter(lambda x: x.type in l, bpy.context.scene.objects))
+
 
 def load_template():
     fn = 'template.blend'
@@ -28,6 +30,7 @@ def load_template():
 
     bpy.ops.wm.append(directory=fn+'/Object/', files=objects)
     bpy.ops.wm.append(directory=fn+'/Material/', files=materials)
+
 
 def prepare():
     bpy.ops.object.select_all(action='DESELECT')
@@ -43,13 +46,23 @@ def prepare():
     cs = filter(lambda x: x.name.startswith('atreus'), bpy.data.collections)
     for c in cs:
         bpy.data.collections.remove(c)
-        
+
+
 def create(fp):
     # import generated assembly file
-    bpy.ops.import_curve.svg(filepath = fp)
+    bpy.ops.import_curve.svg(filepath=fp)
 
-    objs = get_objects(['MESH','CURVE'])
+    objs = get_objects(['MESH', 'CURVE'])
     gap = 0.05 * mm
+
+    key_locs = []
+
+    for obj in objs[len(plates.keys()) + 1::2]:
+        obj.select_set(True)
+        bpy.context.scene.cursor.location = obj.location
+        bpy.ops.object.origin_set(type='ORIGIN_GEOMETRY')
+        key_locs.append((obj.location.x, obj.location.y))
+        obj.select_set(False)
 
     for obj in objs[len(plates.keys()):]:
         obj.select_set(True)
@@ -59,7 +72,7 @@ def create(fp):
     for i, (name, obj) in enumerate(zip(plates.keys(), objs)):
         bpy.context.view_layer.objects.active = None
         bpy.context.view_layer.objects.active = obj
-        
+
         obj.name = name
         obj.select_set(True)
 
@@ -70,12 +83,16 @@ def create(fp):
         obj_data.extrude = h / 2
         bpy.ops.object.mode_set(mode='OBJECT')
 
-        bpy.ops.transform.translate(value = (0, 0, a + (h / 2)), constraint_axis = (True, True, True))
+        bpy.ops.transform.translate(
+            value=(0, 0, a + (h / 2)), constraint_axis=(True, True, True))
         if i != 1:
             a += h + gap
-        
+
         obj.select_set(False)
-    
+
+    return key_locs
+
+
 def move():
     # center the keyboard in x and y
     objs = get_objects(['CURVE'])
@@ -87,7 +104,11 @@ def move():
     kbd = list(objs)[0]
     bpy.context.scene.cursor.location = kbd.location
     bpy.ops.object.origin_set(type='ORIGIN_GEOMETRY')
-    bpy.ops.transform.translate(value=(-kbd.location.x, -kbd.location.y, 0))
+    offset = (kbd.location.x, kbd.location.y)
+    bpy.ops.transform.translate(value=(-offset[0], -offset[1], 0))
+
+    return offset
+
 
 def adjust_materials():
     objs = get_objects(['CURVE'])
@@ -95,7 +116,32 @@ def adjust_materials():
         if obj.name in plates.keys():
             (_, mat) = plates[obj.name]
             obj.data.materials[0] = bpy.data.materials.get(mat)
-        
+
+
+def add_keycaps(kp, ofs, ang):
+    keycap = bpy.data.objects['Keycap']
+    bpy.ops.object.select_all(action='DESELECT')
+
+    for x, y in kp:
+        a = -ang if x > offset[0] else ang
+
+        keycap.select_set(True)
+        bpy.ops.object.duplicate_move(OBJECT_OT_duplicate={"linked": False, "mode": 'TRANSLATION'},
+                                      TRANSFORM_OT_translate={"value": (x - keycap.location.x - ofs[0],
+                                                                        y - keycap.location.y - ofs[1], 0)})
+
+        ov = bpy.context.copy()
+        ov['area'] = [a for a in bpy.context.screen.areas if a.type == "VIEW_3D"][0]
+        bpy.ops.transform.rotate(ov, value=a, orient_axis='Z')
+
+        bpy.ops.object.light_add(type='AREA', radius=1, align='WORLD',
+                                 location=(x - ofs[0], y - ofs[1], 0.004), scale=(1, 1, 1))
+        light_ob = bpy.context.object
+        light = light_ob.data
+        light.energy = 0.05
+        bpy.ops.object.select_all(action='DESELECT')
+
+
 def render(rp):
     # render scene
     scene = bpy.context.scene
@@ -105,14 +151,17 @@ def render(rp):
     render.use_file_extension = True
     render.filepath = rp
     bpy.ops.render.render(write_still=True)
-    bpy.ops.wm.save_as_mainfile(filepath='blender/' + os.path.basename(rp) + '.blend')
-    
+    bpy.ops.wm.save_as_mainfile(
+        filepath='blender/' + os.path.basename(rp) + '.blend')
+
+
 def export(rp):
     bpy.ops.object.select_all(action='DESELECT')
     bpy.data.objects['Plane'].select_set(True)
     bpy.ops.object.delete()
     # create STL file
     bpy.ops.export_mesh.stl(filepath=rp + '.stl')
+
 
 argv = sys.argv
 if "--" not in argv:
@@ -121,6 +170,10 @@ else:
     argv = argv[argv.index("--") + 1:]
 
 fp = argv[0]
+if len(argv) < 2:
+    angle = 0
+else:
+    angle = float(argv[1])
 
 if not os.path.isfile(fp):
     raise OSError(
@@ -128,11 +181,12 @@ if not os.path.isfile(fp):
     )
 
 rp = os.path.splitext(fp)[0]
-    
+
 prepare()
-create(fp)
-move()
+key_locs = create(fp)
+offset = move()
 load_template()
 adjust_materials()
+add_keycaps(key_locs, offset, angle)
 render(rp)
 export(rp)
