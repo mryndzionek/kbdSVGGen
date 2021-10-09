@@ -14,6 +14,8 @@ jobs:
 
     - name: Setup Stack
       uses: mstksg/setup-stack@69e4283faeb7a89f26326daa36e9cc0fa7a023bd
+      env:
+          ACTIONS_ALLOW_UNSECURE_COMMANDS: 'true'
     
     - name: Checkout
       uses: actions/checkout@01aecccf739ca6ff86c0539fbc67a7a5007bbc81
@@ -22,9 +24,9 @@ jobs:
       run: |
         set -ex
         mkdir -p blender
-        wget https://download.blender.org/release/Blender2.90/blender-2.90.0-linux64.tar.xz
-        tar xvJf blender-2.90.0-linux64.tar.xz
-        export PATH=blender-2.90.0-linux64:$PATH
+        wget https://download.blender.org/release/Blender2.93/blender-2.93.5-linux-x64.tar.xz
+        tar xvJf blender-2.93.5-linux-x64.tar.xz
+        export PATH=blender-2.93.5-linux-x64:$PATH
         stack build && time stack exec kbdSVGGen
         set +ex
 
