@@ -379,7 +379,7 @@ render k = do
           "--python",
           "svgto3dpng.py",
           "--",
-          "images/" ++ show k,
+          "images/" ++ show k ++ "_a.svg",
           show $ _angle k ^. rad
         ]
     Nothing -> return ()
