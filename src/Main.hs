@@ -335,6 +335,13 @@ keycaps = do
   cs <- switchHoles cap'
   mirror cs
 
+screws :: KBD (Diagram B)
+screws = do
+  let style c o = fcA (c `withOpacity` o)
+      hole = return $ hexagonalHole 7 # strokePath # style black 0.7
+  scrs <- placeRotated (0 @@ deg) <$> screwPos <*> hole
+  mirror scrs
+
 pprocessInkscape :: String -> IO ()
 pprocessInkscape svgfp = do
   let groups = "g22,g18"
@@ -384,10 +391,11 @@ render k = do
       sf = dpi / 25.4
       lineW = sf * 0.1
       kc = (`runReader` k) keycaps
+      scrs = (`runReader` k) screws
       aStyles = fmap (\c -> fcA (c `withOpacity` 0.5)) (cycle [black, gray, yellow, black, blue])
       diagram = reverse $ zipWith (\s p -> strokePath p # s) aStyles parts
       project = frame 1.05 (vsep 5 diagram) # lwO lineW
-      assembly = frame 1.05 $ mconcat (kc : diagram) # lwO lineW
+      assembly = frame 1.05 $ mconcat (scrs : kc : diagram) # lwO lineW
       sizeSp d = dims2D (sf * width d) (sf * height d)
       generate n d = do
         let sp = sizeSp d
@@ -409,7 +417,8 @@ render k = do
           "svgto3dpng.py",
           "--",
           "images/" ++ show k ++ "_a.svg",
-          show $ _angle k ^. rad
+          show $ _angle k ^. rad,
+          show $ if _split k then 1 else (0 :: Int)
         ]
     Nothing -> return ()
 

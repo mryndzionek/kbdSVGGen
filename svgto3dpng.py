@@ -48,20 +48,32 @@ def prepare():
         bpy.data.collections.remove(c)
 
 
-def create(fp):
+def create(fp, split):
     # import generated assembly file
     bpy.ops.import_curve.svg(filepath=fp)
 
     objs = get_objects(['CURVE'])
     gap = 0.05 * mm
 
-    key_locs = []
+    num_screws = 4 if split else 8
 
-    for obj in objs[len(plates.keys()) + 1::2]:
+    key_locs = []
+    screw_locs = []
+
+    print(len(objs))
+    
+    for obj in objs[len(plates.keys()) + 1:-num_screws:2]:
         obj.select_set(True)
         bpy.context.scene.cursor.location = obj.location
         bpy.ops.object.origin_set(type='ORIGIN_GEOMETRY')
         key_locs.append((obj.location.x, obj.location.y))
+        obj.select_set(False)
+
+    for obj in objs[-num_screws:]:
+        obj.select_set(True)
+        bpy.context.scene.cursor.location = obj.location
+        bpy.ops.object.origin_set(type='ORIGIN_GEOMETRY')
+        screw_locs.append((obj.location.x, obj.location.y))
         obj.select_set(False)
 
     objs = get_objects(['MESH', 'CURVE'])
@@ -92,7 +104,7 @@ def create(fp):
 
         obj.select_set(False)
 
-    return key_locs
+    return key_locs, screw_locs
 
 
 def move():
@@ -120,12 +132,12 @@ def adjust_materials():
             obj.data.materials[0] = bpy.data.materials.get(mat)
 
 
-def add_keycaps(kp, ofs, ang):
-    keycap = bpy.data.objects['Keycap']
+def add_objects(name, kp, ofs, ang, split):
+    keycap = bpy.data.objects[name]
     bpy.ops.object.select_all(action='DESELECT')
 
     for x, y in kp:
-        a = -ang if x > offset[0] else ang
+        a = -ang if split else -ang if x > offset[0] else ang
 
         keycap.select_set(True)
         bpy.ops.object.duplicate_move(OBJECT_OT_duplicate={"linked": False, "mode": 'TRANSLATION'},
@@ -174,11 +186,13 @@ if "--" not in argv:
 else:
     argv = argv[argv.index("--") + 1:]
 
+assert(len(argv) == 3)
+
 fp = argv[0]
-if len(argv) < 2:
-    angle = 0
-else:
-    angle = float(argv[1])
+angle = float(argv[1])
+split = int(argv[2])
+
+print(argv[2])
 
 if not os.path.isfile(fp):
     raise OSError(
@@ -188,10 +202,11 @@ if not os.path.isfile(fp):
 rp = os.path.splitext(fp)[0]
 
 prepare()
-key_locs = create(fp)
+key_locs, screw_locs = create(fp, split)
 offset = move()
 load_template()
 adjust_materials()
-add_keycaps(key_locs, offset, angle)
+add_objects('Keycap', key_locs, offset, angle, split)
+add_objects('Screw', screw_locs, offset, 0.3, split)
 render(rp)
 export(rp)
