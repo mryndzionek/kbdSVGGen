@@ -52,7 +52,7 @@ def create(fp):
     # import generated assembly file
     bpy.ops.import_curve.svg(filepath=fp)
 
-    objs = get_objects(['MESH', 'CURVE'])
+    objs = get_objects(['CURVE'])
     gap = 0.05 * mm
 
     key_locs = []
@@ -63,6 +63,8 @@ def create(fp):
         bpy.ops.object.origin_set(type='ORIGIN_GEOMETRY')
         key_locs.append((obj.location.x, obj.location.y))
         obj.select_set(False)
+
+    objs = get_objects(['MESH', 'CURVE'])
 
     for obj in objs[len(plates.keys()):]:
         obj.select_set(True)
@@ -138,7 +140,10 @@ def add_keycaps(kp, ofs, ang):
                                  location=(x - ofs[0], y - ofs[1], 0.004), scale=(1, 1, 1))
         light_ob = bpy.context.object
         light = light_ob.data
-        light.energy = 0.05
+        light.energy = 0.025
+        light.shape = 'DISK'
+        light.size = 0.2
+        light.color = (1, 0.507307, 0.01755)
         bpy.ops.object.select_all(action='DESELECT')
 
 

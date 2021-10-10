@@ -335,6 +335,35 @@ keycaps = do
   cs <- switchHoles cap'
   mirror cs
 
+pprocessInkscape :: String -> IO ()
+pprocessInkscape svgfp = do
+  let groups = "g22,g18"
+      paths = ["path20", "path16", "path12"]
+      actions =
+        concat
+          ( ( \p ->
+                "select:"
+                  ++ p
+                  ++ "; SelectionUnion; select-clear; "
+            )
+              <$> paths
+          )
+  inp <- findExecutable "inkscape"
+  case inp of
+    Just fp ->
+      callCommand
+        ( fp ++ " "
+            ++ "--with-gui "
+            ++ "--actions=\"select:"
+            ++ groups
+            ++ "; SelectionUnGroup; select-clear; "
+            ++ actions
+            ++ "; FileSave; FileClose; FileQuit;"
+            ++ "\" "
+            ++ svgfp
+        )
+    Nothing -> return ()
+
 render :: KBDCfg -> IO ()
 render k = do
   let drillHoles p = (<>) <$> p <*> (reversePath <$> screwHoles)
@@ -366,7 +395,7 @@ render k = do
         renderSVG n sp d
   generate ("images/" ++ show k ++ ".svg") project
   generate ("images/" ++ show k ++ "_a.svg") assembly
-  print $ _angle k ^. rad
+  pprocessInkscape $ "images/" ++ show k ++ "_a.svg"
   blp <- findExecutable "blender"
   case blp of
     Just fp ->
