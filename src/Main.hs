@@ -451,9 +451,9 @@ gallery ks =
               [ "## " ++ entry ++ "\n",
                 "Rendered in Blender\n",
                 "![" ++ entry ++ "3d](images/" ++ entry ++ "_a.png)\n",
-                "[" ++ entry ++ " STL file](images/" ++ entry ++ "_a.stl)\n",
+                -- "[" ++ entry ++ " STL file](images/" ++ entry ++ "_a.stl)\n",
                 "SVG files for CNC cutting\n",
-                "![" ++ entry ++ "a](images/" ++ entry ++ "_a.svg)\n",
+                -- "![" ++ entry ++ "a](images/" ++ entry ++ "_a.svg)\n",
                 "![" ++ entry ++ "](images/" ++ entry ++ ".svg)\n"
               ]
    in writeFile "GALLERY.md" $ "# Gallery\n\n" ++ concatMap gen ks
