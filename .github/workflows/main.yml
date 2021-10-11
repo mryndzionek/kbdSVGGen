@@ -27,17 +27,32 @@ jobs:
         wget https://download.blender.org/release/Blender2.93/blender-2.93.5-linux-x64.tar.xz
         tar xvJf blender-2.93.5-linux-x64.tar.xz
         export PATH=blender-2.93.5-linux-x64:$PATH
-        wget https://inkscape.org/gallery/item/29256/Inkscape-3bf5ae0-x86_64.AppImage
-        ln -sf Inkscape-3bf5ae0-x86_64.AppImage inkscape
-        export PATH=$PWD:$PATH
+        # wget https://inkscape.org/gallery/item/29256/Inkscape-3bf5ae0-x86_64.AppImage
+        # chmod u+x Inkscape-3bf5ae0-x86_64.AppImage
+        # ln -sf Inkscape-3bf5ae0-x86_64.AppImage inkscape
+        # export PATH=$PWD:$PATH
+        # inkscape --version
         stack build && time stack exec kbdSVGGen
+        mkdir stl
+        mv images/*.stl stl
+        mkdir png
+        mv images/*.png png
         set +ex
 
     - uses: actions/upload-artifact@e7eefc491732c06d0ebbf4d4f49dcc25b4d2f3a8
       with:
-        name: images
-        path: images
+        name: stl
+        path: stl
 
+    - uses: actions/upload-artifact@e7eefc491732c06d0ebbf4d4f49dcc25b4d2f3a8
+      with:
+        name: png
+        path: png
+
+    - uses: actions/upload-artifact@e7eefc491732c06d0ebbf4d4f49dcc25b4d2f3a8
+      with:
+        name: svg
+        path: images
 
     - uses: actions/upload-artifact@e7eefc491732c06d0ebbf4d4f49dcc25b4d2f3a8
       with:

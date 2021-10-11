@@ -361,12 +361,12 @@ pprocessInkscape svgfp = do
     Just fp ->
       callCommand
         ( fp ++ " "
-            ++ "--with-gui "
+            ++ "--batch-process "
             ++ "--actions=\"select:"
             ++ groups
             ++ "; SelectionUnGroup; select-clear; "
             ++ actions
-            ++ "; FileSave; FileClose; FileQuit;"
+            ++ "; FileSave; FileClose;"
             ++ "\" "
             ++ svgfp
         )
