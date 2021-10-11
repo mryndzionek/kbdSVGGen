@@ -54,6 +54,7 @@ data KBDCfg = KBDCfg
     _screwSize :: Double,
     _washerSize :: Double,
     _screwHole :: Double -> Path V2 Double,
+    _screwsAllTheWay :: Bool,
     _sep :: Double,
     _split :: Bool,
     _topNotch :: Maybe Double,
@@ -371,22 +372,31 @@ pprocessInkscape svgfp = do
         )
     Nothing -> return ()
 
+getParts :: KBD [Path V2 Double]
+getParts = do
+  let drillHoles p = (<>) <$> p <*> (reversePath <$> screwHoles)
+  satw <- asks _screwsAllTheWay
+  if satw
+    then
+      traverse
+        drillHoles
+        [ bottomPlate,
+          spacerPlate,
+          switchPlate,
+          topPlate
+        ]
+    else
+      sequence $
+        ( drillHoles
+            <$> [ bottomPlate,
+                  spacerPlate
+                ]
+        )
+          ++ [switchPlate, topPlate]
+
 render :: KBDCfg -> IO ()
 render k = do
-  let drillHoles p = (<>) <$> p <*> (reversePath <$> screwHoles)
-      parts =
-        (`runReader` k)
-          <$> insertAt
-            1
-            spacerPunch
-            ( fmap
-                drillHoles
-                [ bottomPlate,
-                  spacerPlate,
-                  switchPlate,
-                  topPlate
-                ]
-            )
+  let parts = (`runReader` k) (insertAt 1 <$> spacerPunch <*> getParts)
       dpi = 96
       sf = dpi / 25.4
       lineW = sf * 0.1
@@ -418,7 +428,8 @@ render k = do
           "--",
           "images/" ++ show k ++ "_a.svg",
           show $ _angle k ^. rad,
-          show $ if _split k then 1 else (0 :: Int)
+          show . fromEnum $ _split k,
+          show . fromEnum $ _screwsAllTheWay k
         ]
     Nothing -> return ()
 
@@ -483,6 +494,7 @@ main = do
             _screwSize = 3,
             _washerSize = 13,
             _screwHole = roundHole,
+            _screwsAllTheWay = True,
             _sep = 50,
             _split = False,
             _topNotch = Nothing,
