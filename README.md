@@ -30,6 +30,10 @@ First keyboard built based on generated files [here](https://gist.github.com/mry
   <img src="gifs/blender_2.gif">
 </p>
 
+<p align="center">
+  <img src="gifs/atreus52ct_a.gif">
+</p>
+
 ![atreus423d](images/atreus42_a.png)
 ![atreus42a](images/atreus42_a.svg)
 ![atreus42](images/atreus42.svg)
