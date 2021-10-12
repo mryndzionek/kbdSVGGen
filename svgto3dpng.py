@@ -7,11 +7,21 @@ import mathutils
 
 mm = 0.001
 
-plates = {'bottomPlate': (1.5 * mm, 'steel'),
-          'bottomNotch': (1.0 * mm, 'wood'),
-          'spacerPlate': (8.0 * mm, 'acrylic'),
-          'switchPlate': (1.5 * mm, 'steel'),
-          'topPlate': (3 * mm, 'wood')}
+
+def get_plates(screws):
+    if screws:
+        return {'bottomPlate': (1.5 * mm, 'steel'),
+                'bottomNotch': (1.0 * mm, 'wood'),
+                'spacerPlate': (8.0 * mm, 'acrylic'),
+                'switchPlate': (1.5 * mm, 'steel'),
+                'topPlate': (3 * mm, 'wood')}
+    else:
+        return {'bottomPlate': (1.5 * mm, 'wood'),
+                'bottomNotch': (1.0 * mm, 'wood'),
+                'spacerPlate': (8.0 * mm, 'acrylic'),
+                'switchPlate': (1.5 * mm, 'steel'),
+                'strengtheningPlate': (1.5 * mm, 'steel'),
+                'topPlate': (1.5 * mm, 'wood')}
 
 
 def get_objects(l):
@@ -48,18 +58,17 @@ def prepare():
         bpy.data.collections.remove(c)
 
 
-def create(fp, split, screws):
+def create(fp, split, plates, gap):
     # import generated assembly file
     bpy.ops.import_curve.svg(filepath=fp)
 
     objs = get_objects(['CURVE'])
-    gap = 0.05 * mm if screws else 0.0 * mm
 
     num_screws = 4 if split else 8
 
     key_locs = []
     screw_locs = []
-    
+
     for obj in objs[len(plates.keys()) + 1:-num_screws:2]:
         obj.select_set(True)
         bpy.context.scene.cursor.location = obj.location
@@ -122,7 +131,7 @@ def move():
     return offset
 
 
-def adjust_materials():
+def adjust_materials(plates):
     objs = get_objects(['CURVE'])
     for obj in objs:
         if obj.name in plates.keys():
@@ -199,10 +208,12 @@ if not os.path.isfile(fp):
 rp = os.path.splitext(fp)[0]
 
 prepare()
-key_locs, screw_locs = create(fp, split, screws)
+plates = get_plates(screws)
+gap = 0.05 * mm if screws else 0.0 * mm
+key_locs, screw_locs = create(fp, split, plates, gap)
 offset = move()
 load_template()
-adjust_materials()
+adjust_materials(plates)
 add_objects('Keycap', key_locs, offset, angle, split)
 if screws:
     add_objects('Screw', screw_locs, offset, 0.3, split)

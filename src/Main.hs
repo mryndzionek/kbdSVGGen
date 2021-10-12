@@ -265,6 +265,12 @@ switchPlate = do
   let hole = asks _switchHole <*> asks _switchHoleSize
   difference Winding <$> bottomPlate <*> (hole >>= switchHoles >>= mirrorP)
 
+strengtheningPlate :: KBD (Path V2 Double)
+strengtheningPlate = do
+  shs <- asks _switchHoleSize
+  let hole = switchHoleSquare (shs + 4)
+  difference Winding <$> bottomPlate <*> (switchHoles hole >>= mirrorP)
+
 serialNumber :: KBD (Path V2 Double)
 serialNumber = do
   f <- asks _textFont
@@ -343,10 +349,13 @@ screws = do
   scrs <- placeRotated (0 @@ deg) <$> screwPos <*> hole
   mirror scrs
 
-pprocessInkscape :: String -> IO ()
-pprocessInkscape svgfp = do
-  let groups = "g22,g18"
-      paths = ["path20", "path16", "path12"]
+pprocessInkscape :: String -> Bool -> IO ()
+pprocessInkscape svgfp scr = do
+  let groups = if scr then "g22,g18" else "g26,g22,g18"
+      paths =
+        if scr
+          then ["path20", "path16", "path12"]
+          else ["path24", "path20", "path16", "path12"]
       actions =
         concat
           ( ( \p ->
@@ -392,7 +401,7 @@ getParts = do
                   spacerPlate
                 ]
         )
-          ++ [switchPlate, topPlate]
+          ++ [switchPlate, strengtheningPlate, topPlate]
 
 render :: KBDCfg -> IO ()
 render k = do
@@ -413,7 +422,7 @@ render k = do
         renderSVG n sp d
   generate ("images/" ++ show k ++ ".svg") project
   generate ("images/" ++ show k ++ "_a.svg") assembly
-  pprocessInkscape $ "images/" ++ show k ++ "_a.svg"
+  pprocessInkscape ("images/" ++ show k ++ "_a.svg") (_screwsAllTheWay k)
   blp <- findExecutable "blender"
   case blp of
     Just fp ->
