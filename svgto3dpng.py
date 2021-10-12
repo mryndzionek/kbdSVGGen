@@ -215,6 +215,7 @@ offset = move()
 load_template()
 adjust_materials(plates)
 add_objects('Keycap', key_locs, offset, angle, split)
+add_objects('Switch', key_locs, offset, angle, split)
 if screws:
     add_objects('Screw', screw_locs, offset, 0.3, split)
 render(rp)
