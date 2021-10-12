@@ -23,9 +23,9 @@ cabal.sandbox.config
 .stack-work/
 .vscode/
 blender/
+images/*.stl
 cabal.project.local
 cabal.project.local~
 .HTF/
 .ghc.environment.*
 ghcid.txt
-
