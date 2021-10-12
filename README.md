@@ -17,7 +17,7 @@ Inkscape can also be used to convert the files to other formats like DXF.
 Generated Blender files tarballs can be found in releases.
 Blender files can be tweaked manually:
 
-![atreus52ct_a](images/atreus52ct_a.png)
+![atreus52ct_a_edited](images/atreus52ct_a_edited.png)
 
 Full gallery [here](GALLERY.md).
 First keyboard built based on generated files [here](https://gist.github.com/mryndzionek/0fb397242e55262d831ccf3e8f38dcb0).
