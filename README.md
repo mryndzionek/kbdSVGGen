@@ -22,6 +22,10 @@ Blender files can be tweaked manually:
 ![atreus52ct_a_parts](images/atreus52ct_a_parts.png)
 ![atreus52ct_a_parts_transparent](images/atreus52ct_a_parts_transparent.png)
 
+<p align="center">
+  <img src="gifs/atreus52ct_a.gif">
+</p>
+
 Full gallery [here](GALLERY.md).
 First keyboard built based on generated files [here](https://gist.github.com/mryndzionek/0fb397242e55262d831ccf3e8f38dcb0).
 
@@ -33,9 +37,6 @@ First keyboard built based on generated files [here](https://gist.github.com/mry
   <img src="gifs/blender_2.gif">
 </p>
 
-<p align="center">
-  <img src="gifs/atreus52ct_a.gif">
-</p>
 
 ![atreus423d](images/atreus42_a.png)
 ![atreus42a](images/atreus42_a.svg)
